@@ -1,0 +1,84 @@
+---
+title: "J381M_H02_data_basics"
+date: "2026-01-22"
+author: "Shengchun Huang"
+output: 
+  html_document:
+    code_folding: show
+    highlight: haddock
+    number_sections: yes
+    theme: lumen
+    toc: yes
+    toc_depth: 4
+    toc_float: yes
+urlcolor: blue
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+# Setup chunk: logical settings for the document
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.width=8, fig.height=4)
+options(scipen = 0, digits = 3)
+```
+
+\pagebreak
+
+# Objectives {-}
+
+Welcome! This week, we are delving deeper to understand data structures and data wrangling, continuing to build our R programming skills. If you have any questions, come to office hours (TH 9:30-10:30am, DMC 3.370), or ask questions on Slack in our class channel #j381m.
+
+Data Science is a field of science connecting statistics, computer science, and domain knowledge. We would like to discover the pattern of differences and changes, as well as the reasons behind the scene. For any well-designed study, we need a clear goal of the study. Using domain knowledge we may list possible factors related to the study, i.e., we need to first design what information may help us to achieve the goal. Taking feasibility and cost into account, we will either collect original data of interest (e.g., from experiments, surveys, or interviews), or we may learn important insights from existing data (e.g., from public databases, or from other studies). In either case, we need to ensure the quantity and quality of data, which determines the success of the study. 
+
+Once we have the data, we proceed to extract useful information. To use the data correctly and efficiently we must understand the data first. In this lecture, we go through some basic data acquisition/preparation to understand the nature of the data. We defer the analysis later. 
+
+
+Contents for today:
+
+0. Recap:  
+    + Find the R project you created last week. (If you cannot find it, create a new one, and save it to somewhere easy to find, e.g., Desktop.)
+    + Start a new R script within this project on R studio.
+    + Downloaded the handouts folder from Canvas and saved it to your local computer
+
+1. Data Types and Structures
+    + Data types: numeric, character, logical, factor, ...
+    + Data structures: vectors, matrices, lists, data frames
+    + Data frames: columns and rows
+
+2. Data Wrangling with "dplyr"
+    + Recap on library() and install.packages()
+    + Select columns and filter rows
+    + Assign values to variables: mutate()
+        - *extended but super useful content: ifelse() and case_when() 
+    + Rename columns: rename()
+    + Arrange rows: arrange()
+    + Summarize data: group_by() and summarize()
+        - *extended: long to wide format and wide to long format with pivot_wider() and pivot_longer()
+
+**Handy cheat sheets**
+
+[DPLYR Cheat Sheet](https://posit.co/wp-content/uploads/2022/10/data-transformation-1.pdf)
+
+
+
+
+# columns and rows {-}
+
+First, we need to understand what we want to achieve the goal, likely you have the variables. In R, the columns of a data frame represent variables. Then we need to understand how these variables are related to each other
+
+
+
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

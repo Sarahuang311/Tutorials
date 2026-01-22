@@ -1,0 +1,452 @@
+---
+title: "J381M_H02_data_basics"
+date: "2026-01-22"
+author: "Shengchun Huang"
+output: 
+  html_document:
+    code_folding: show
+    highlight: haddock
+    number_sections: yes
+    theme: lumen
+    toc: yes
+    toc_depth: 4
+    toc_float: yes
+urlcolor: blue
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+# Setup chunk: logical settings for the document
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.width=8, fig.height=4)
+options(scipen = 0, digits = 3)
+```
+
+\pagebreak
+
+# Objectives {-}
+
+Welcome! This week, we are delving deeper to understand data structures and data wrangling, continuing to build our R programming skills. If you have any questions, come to office hours (TH 9:30-10:30am, DMC 3.370), or ask questions on Slack in our class channel #j381m.
+
+Data Science is a field of science connecting statistics, computer science, and domain knowledge. We would like to discover the pattern of differences and changes, as well as the reasons behind the scene. For any well-designed study, we need a clear goal of the study. Using domain knowledge we may list possible factors related to the study, i.e., we need to first design what information may help us to achieve the goal. Taking feasibility and cost into account, we will either collect original data of interest (e.g., from experiments, surveys, or interviews), or we may learn important insights from existing data (e.g., from public databases, or from other studies). In either case, we need to ensure the quantity and quality of data, which determines the success of the study. 
+
+Once we have the data, we proceed to extract useful information. To use the data correctly and efficiently we must understand the data first. In this lecture, we go through some basic data acquisition/preparation to understand the nature of the data. We defer the analysis later. 
+
+
+Contents for today:
+
+0. Recap:  
+    + Find the R project you created last week. (If you cannot find it, create a new one, and save it to somewhere easy to find, e.g., Desktop.)
+    + Start a new R script within this project on R studio.
+    + Downloaded the handouts folder from Canvas and saved it to your local computer
+
+1. Data Types and Structures
+    + Data types: numeric, character, logical, factor, ...
+    + Data structures: vectors, matrices, lists, data frames
+    + Data frames: columns and rows
+
+2. Data Wrangling with "dplyr"
+    + Recap on library() and install.packages()
+    + Select columns and filter rows
+    + Assign values to variables: mutate()
+        - *extended but super useful content: ifelse() and case_when() 
+    + Rename columns: rename()
+    + Arrange rows: arrange()
+    + Summarize data: group_by() and summarize()
+        - *extended: long to wide format and wide to long format with pivot_wider() and pivot_longer()
+
+**Handy cheat sheets**
+
+[DPLYR Cheat Sheet](https://posit.co/wp-content/uploads/2022/10/data-transformation-1.pdf)
+
+# Recap (Week 1) {-}
+
+Before we dive in, let's ensure our foundations are solid.
+
+The Workflow Checklist
+Did you open RStudio by double-clicking your .Rproj file? (Always work in a project!)
+
+Is your environment empty? (Good practice to start fresh).
+```{r empty_environment, echo=TRUE}
+rm(list = ls()) # run this line at the very beginning to clear your environment
+```
+
+Quick Warm-up
+Let's recreate a few variables like we did last week.
+```{r warmup, echo=TRUE}
+# 1. Assign a numeric value
+my_age <- 25 
+
+# 2. Assign a character (string) value
+my_name <- "Shengchun" 
+
+# 3. Create a vector (a list of items)
+# We use c() which stands for "combine"
+grades <- c(95, 82, 75, 88, 100)
+
+# 4. Use a function on that vector
+mean(grades)
+
+# try run this: mean(Grades) 
+# R is case-sensitive. mean(Grades) will throw an error because grades is lowercase
+```
+
+# Data Types {-}
+
+In Excel, you can type "10" in one cell and "Ten" in the next, and Excel doesn't mind. R is strict. If a function expects a number and you give it text, it will break.
+
+We need to know the four major types:
+
+Numeric/Double: Numbers (e.g., 1.5, 10).
+
+Character: Text strings (e.g., "Hello", "Data"). Must be in quotes.
+
+Logical: TRUE or FALSE. (Crucial for filtering data!).
+
+Factor: Categories with a fixed set of levels (e.g., "Low", "Medium", "High"); often with an inherent order.
+
+(We have more types, such as date, but these are the main ones for now.)
+
+Checking types
+Use class() to ask R what a variable is.
+```{r check_types, echo=TRUE}
+x <- 10.5
+class(x) # Output: "numeric"
+
+y <- "10.5" # Notice the quotes!
+class(y) # Output: "character"
+
+z <- TRUE
+class(z) # Output: "logical"
+
+f <- factor(c("Low", "Medium", "High", "Medium"))
+class(f) # Output: "factor"
+
+# you can also do something like this:
+my_factor <- factor(c("Apple", "Banana", "Orange"), levels = c("Apple", "Orange", "Banana"))
+my_factor
+class(my_factor) # Output: "factor"
+
+# or this:
+my_factor_newname <- factor(my_factor, levels = c("Apple", "Orange", "Banana"), labels = c("A", "O", "B"))
+my_factor_newname
+
+# this is super helpful when you try to rename factor levels! for example, now you want to rename some levels for the variable "education" in your dataset from "High School", "Bachelor", "Master", "PhD" to "HS", "BA", "MA", "PhD" 
+factor_edu <- factor(c("High School", "Bachelor", "Master", "PhD")) # create this factor variable
+factor_edu
+factor_edu_renamed <- factor(factor_edu, levels = c("High School", "Bachelor", "Master", "PhD"), labels = c("HS", "BA", "MA", "PhD"))
+factor_edu_renamed
+```
+Why does this matter? Because coercion may happen if you are doing something wrong with a not applied data type.
+
+For example, if you try to do math on a character, R will complain.
+
+```{r coercion_example, echo=TRUE}
+# class(x) # numeric
+# x + 5  # This works (10.5 + 5)
+# class(y) # character
+# y + 5  # This fails because "10.5" is text to R.
+```
+
+However, vectors must be homogeneous (i.e., all in the same type). If you mix them, R forces them into the simplest type possible. This is called Coercion.
+
+```{r coercion_example2, echo=TRUE}
+# A numeric vector
+nums <- c(1, 2, 3) 
+class(nums)
+
+# What if we add a word?
+mixed <- c(1, 2, "3") 
+mixed
+class(mixed)
+# R coerced the numbers into characters!
+```
+
+Note: R turned everything into characters (note the quotes around "1" and "2"). This is a common bug in data analysis. If your dataset imports numbers as text, you cannot calculate the mean.
+
+Factors (The Tricky One)
+Factors are used for categorical variables. They look like text, but underneath, R stores them as integers.
+
+```{r factor_example, echo=TRUE}
+# Create a vector of sizes
+sizes <- c("small", "medium", "small", "large")
+
+# Convert to factor
+sizes_factor <- factor(sizes, levels = c("small", "medium", "large"))
+
+sizes_factor
+as.numeric(sizes_factor) # See? Underneath, they are 1, 2, and 3! This means that "small" < "medium" < "large"
+class(sizes_factor) # Output: "factor"
+
+# If you create a factor without specifying levels, R orders them alphabetically by default
+sizes_factor2 <- factor(sizes, levels = c("large", "small", "medium")) # let's change the order and see what is happening
+sizes_factor2
+as.numeric(sizes_factor2) # "large" is 1,"small" is 2, "medium" is 3 -> takeaway: always specify levels when creating factors, as these levels determine the order of the factor.
+```
+
+
+# Data Structures {-}
+
+Now, how do we organize these values? We put them in the right data structure. To differentiate between "data types" and "data structures", imagine data types as the nature of the items (numbers, text, etc.) and data structures as the containers that hold these items.
+
+We have the following data structures:
+
+    Vector: A 1-dimensional collection of the SAME data type.
+    
+    Matrix: A 2-dimensional collection (rows/cols) of the SAME data type.
+    
+    List: A collection that can hold DIFFERENT data types (even hold other lists!).
+    
+    Data Frame: A 2-dimensional table (like Excel). Columns can be different types (one numeric, one character), but rows must be aligned.
+
+```{r data_structures_example, echo=TRUE}
+# Vector
+v <- c(1, 2, 3, 4)
+
+# Matrix (all numbers)
+m <- matrix(1:9, nrow = 3)
+m # you may notice that R determines to fill the matrix by column first
+
+# when you have several vectors, you can combine them into a matrix by rbind() or cbind()
+var1 <- c(1,2,3)
+var2 <- c(4,5,6)
+var3 <- c(7,8,9)
+m2 <- rbind(var1, var2, var3) # row bind
+
+# Data Frame (The most common structure for analysis!)
+df <- data.frame(
+  id = c(1, 2, 3),
+  name = c("Alice", "Bob", "Charlie"),
+  score = c(85, 90, 88)
+)
+df
+
+# you can convert a matrix to a data frame
+df2 <- as.data.frame(m)
+df2 # now the colnames are automatically assigned as V1, V2, V3
+
+# you can also determine the colnames when you create the data frame from a matrix
+df3 <- as.data.frame(m)
+colnames(df3) <- c("Col1", "Col2", "Col3")
+df3
+
+# List (can mix anything)
+l <- list(name = "Shengchun", scores = c(90, 85, 95), active = TRUE)
+l # the list contains a character, a numeric vector, and a logical value
+# You can access list elements using $ or [[ ]]
+l$name
+l$scores
+l$active
+
+# actually, model object is often a list, you can use str() function to check the structure of a model object, for example:
+model <- lm(score ~ id, data = df) # this is the function to run an OLS model
+str(model) # check the structure of the linear model object
+
+```
+
+Now, we have some basic knowledge about the data structure in R. The next step is to process the data for analysis. The most common data structure we will work with is the Data Frame.
+
+Let's recap on library() and install.packages()
+
+To assist data processing (wrangling), we will use the "dplyr" package, which is part of the "tidyverse" collection of R packages.
+
+
+```{r load_tidyverse, echo=TRUE}
+# We will use the 'tidyverse' bundle which includes dplyr
+library(tidyverse) # if you did not install it, run install.packages("tidyverse") first
+
+# We will use the 'starwars' dataset built into the package
+data("starwars")
+glimpse(starwars) # glimpse is a cleaner version of str(), to show you some basic information about the dataset
+```
+
+# Select columns {-}
+
+To select specific columns from a data frame, we use the `select()` function from the `dplyr` package.
+
+```{r select_columns, echo=TRUE}
+# what are the column names?
+colnames(starwars)
+
+# select specific columns
+starwars |> 
+  select(name, height, species)
+
+# can you try selecting different columns?
+```
+
+# Filter rows {-}
+
+To filter rows based on conditions, we use the `filter()` function.
+
+```{r filter_rows, echo=TRUE}
+# filter rows where (e.g., only Droids)
+starwars |> 
+  filter(species == "Droid") # Important! Use == for indicating equality in R, not =; in R, = is used for assignment, while == is used for comparison.
+
+# can you try filtering different conditions? (e.g., height > 200)
+
+```
+
+# Mutate: Create or transform columns {-}
+
+To create new columns or transform existing ones, we use the `mutate()` function.
+```{r mutate_columns, echo=TRUE}
+# convert height from cm to meters
+starwars |> 
+  select(name, height) |> 
+  mutate(height_m = height / 100)
+
+# can you try creating a new column? (e.g., create a new column "age", using 2026 - birth_year)
+```
+
+
+Extended content: ifelse() and case_when() {-}
+(If time permits)
+
+These are powerful tools for creating conditional variables.
+
+ifelse(condition, value_if_true, value_if_false): Good for binary choices.
+
+case_when(): Good for multiple categories.
+
+```{r conditional_variables, echo=TRUE}
+starwars_newdata <- 
+  starwars |> 
+  select(name, height, species) |> 
+  mutate(
+    # 1. Simple binary category using ifelse
+    tall_or_short = ifelse(height > 160, "Tall", "Short"),
+    
+    # 2. Multiple categories using case_when
+    size_category = case_when(
+      height < 100 ~ "Small",
+      height < 170 ~ "Medium",
+      height >= 170 ~ "Large",
+      TRUE ~ "Unknown" # Catch-all for NAs or other values
+    )
+  )
+
+head(starwars_newdata)
+
+# what is the data type for the new columns tall_or_short and size_category? Are they character or factor?
+class(starwars_newdata$tall_or_short) 
+class(starwars_newdata$size_category)
+
+# you may notice that both are character type, if you want to convert them to factor type, you can do this:
+starwars_newdata2 <- 
+  starwars_newdata |> 
+  mutate(
+    tall_or_short = factor(tall_or_short, levels = c("Short", "Tall")),
+    size_category = factor(size_category, levels = c("Small", "Medium", "Large", "Unknown"))
+  )
+
+# check it again
+class(starwars_newdata2$tall_or_short)
+class(starwars_newdata2$size_category)
+
+```
+
+# Rename columns {-}
+
+Sometimes raw data has messy names (e.g., Q1_response_final_v2). Use rename() to clean them up. Syntax: rename(new_name = old_name)
+
+```{r rename_columns, echo=TRUE}
+starwars |> 
+  select(name, height) |> 
+  rename(character_name = name, 
+         height_cm = height)
+
+# can you try renaming different columns? which side of the = is the new name and which side is the old name? 
+```
+
+# Arrange rows {-}
+
+Sort your data with arrange(). Use desc() for descending order. This function is helpful when you want to see top or bottom records. (e.g., who are the users who contributed the most posts?)
+
+```{r arrange_rows, echo=TRUE}
+# Who are the heaviest characters?
+starwars |> 
+  select(name, mass) |> 
+  arrange(desc(mass))
+
+# can you try arranging different columns? (e.g., arrange by height in ascending order)
+```
+
+
+# Summarize data {-}
+
+This is the "Pivot Table" of R. This is super powerful for you to take a birdview of your data, before diving into detailed analysis.
+
+group_by(): Splits data into groups invisibly.
+
+summarize(): Calculates one number per group.
+
+```{r summarize_data, echo=TRUE}
+# What is the average height for each species?
+starwars |> 
+  filter(species %in% c("Human", "Droid", "Wookiee")) |> # Let's just look at 3 species
+  group_by(species) |> 
+  summarize(
+    avg_height = mean(height, na.rm = TRUE), # na.rm ignores missing values
+    count = n() # n() counts how many rows are in each group
+  )
+
+# can you try summarizing different columns? (e.g., average mass for each homeworld)
+```
+
+
+Extended content: pivot_wider() and pivot_longer() {-}
+(If time permits)
+
+Sometimes data is shaped not in a manageable way for analysis.
+
+Wide: Many columns (e.g., 2020, 2021, 2022). Good for human reading. But you may want to put all the years into one column "year" for analysis.
+
+Long: Key-Value pairs. Good for R plotting and analysis.
+
+We use pivot_longer() and pivot_wider() to do these transformations.
+
+```{r pivot_data, echo=TRUE}
+# Let's create a dummy WIDE dataset
+wide_data <- data.frame(
+  country = c("A", "B"),
+  year_2020 = c(100, 200),
+  year_2021 = c(110, 210)
+)
+print(wide_data)
+
+# 1. Wide to Long (pivot_longer)
+long_data <- wide_data |> 
+  pivot_longer(
+    cols = c(year_2020, year_2021), 
+    names_to = "year", 
+    values_to = "gdp"
+  )
+print(long_data)
+
+# 2. Long to Wide (pivot_wider)
+# Getting back to the original shape
+long_data |> 
+  pivot_wider(
+    names_from = "year",
+    values_from = "gdp"
+  )
+```
+
+A small task for you! {-}
+
+Using the "starwars" dataset (you already have it loaded), do the following:
+
+    1. Filter for characters that are Human.
+
+    2. Select the name, mass, and homeworld.
+
+    3. Mutate a new column called weight_status using ifelse(): if mass is greater than 80, label "Heavy", otherwise "Light".
+
+    4. Group by weight_status and calculate the average mass.
+
+Take 5-10 minutes. Raise your hand if you get stuck!
+
+
+
