@@ -1,0 +1,346 @@
+---
+title: "J381M_H04_nlp"
+author: "Shengchun Huang"
+date: "2026-02-05"
+output: 
+  html_document:
+    code_folding: show
+    highlight: haddock
+    number_sections: yes
+    theme: lumen
+    toc: yes
+    toc_depth: 4
+    toc_float: yes
+urlcolor: blue
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+# this is the chunk for setting up the environment. It will not be included in the final output (include=FALSE). Run it before you run the following chunks.
+knitr::opts_chunk$set(echo = TRUE, fig.width=8, fig.height=4)
+options(scipen = 0, digits = 3)  # controls base R output
+```
+
+\pagebreak
+
+# Objectives {-}
+
+Welcome back to J381M!
+
+In this tutorial, we will move beyond standard numerical data and learn how to process unstructured text data. This field is broadly known as Natural Language Processing (NLP) or Computational Text Analysis.
+
+Why do we need NLP? The vast majority of human-generated data (social media posts, news articles, open-ended survey responses) exists as text, not numbers. Computers cannot inherently "read" language, so we must learn techniques to convert words into mathematical structures. This allows us to quantify sentiment, discover hidden themes, and scale our analysis from reading 10 posts to analyzing 10,000. (Also, LLMs like ChatGPT are built on NLP techniques!)
+
+NLP is a big topic, so today we will focus on the basics of text processing and some common analysis techniques. For extended learning, I recommend the book ["Text Mining with R" by Julia Silge and David Robinson (available free online).](https://www.tidytextmining.com/) and Text as Data: A New Framework for Machine Learning and the Social Sciences by Justin Grimmer, Margaret E. Roberts, and Brandon M. Stewart (accessible via the UT library).
+
+Content of today:
+
+0. Set-up: 
+    + Start a new R script in R studio in your j381m project folder and clean the environment before you start (use `rm = list (ls())`)
+    + Install and library required packages
+    + Read the data (Make sure the practice sample dataset is in the same folder)
+
+1. Processing the text data:
+    + Tokenization: Breaking long strings of text (sentences) into individual units (words).
+    + Cleaning: Removing "stop words" (common words like "the", "and", "is") that often do not add semantic value.
+    + Standardization: Converting text to lower case and handling special characters.
+
+2. Text Analysis: 
+    + Descriptive analysis (Exercise: counting word frequency)
+    + Sentiment analysis (Exercise: how do we quantify emotion in text?)
+    + Topic modeling (Exercise: discovering hidden topics using LDA and STM in a corpus)
+
+# Set up the environment {-}
+
+```{r library,  message=FALSE, warning=FALSE}
+# Install and load required packages
+library(tidyverse)    # For data manipulation and plotting
+library(tidytext)     # For text mining tools
+library(topicmodels)  # For LDA topic modeling
+library(stm)          # For Structural Topic Modeling
+library(ggplot2)      # For enhanced plotting
+library(wordcloud)    # For creating a word cloud 
+library(textdata)    # For sentiment analysis lexicons
+library(reshape2)      # For data reshaping
+
+# a trick to use multiple packages together:
+if(!require('pacman')) {install.packages('pacman')}
+pacman::p_load(tidyverse, tidytext, topicmodels, stm, ggplot2, wordcloud, textdata, reshape2)
+
+# Read the data
+raw_data <- read_csv("exercise_data_reddit_inflation_political.csv")
+
+#let's take a look at the data (you can also click it in the environment to view as a table)
+head(raw_data)
+str(raw_data)
+
+
+```
+
+From the quick look of the data, we can see that the dataset contains Reddit posts about inflation and politics. The main text content to be analyzed for today is saved in the `title` and `selftext` columns.
+
+Now, with the raw data, we can start processing and analyzing the text! As you see, text data is often "unstructured," meaning it doesn't come in neat rows and columns like an Excel spreadsheet. To analyze it, we must first clean it and break it down into mathematical objects (counts, probabilities, and matrices).
+
+This process is often called "text processing" or "text wrangling." Let's get started!
+
+# Text Processing {-}
+
+Before we can analyze the text, we need to tidy it. This involves three main steps:
+    
+  - Combine text: We have meaningful text in both the title and selftext columns. We should merge them.
+  - Tokenization: Breaking sentences into individual words.
+  - Stop word removal: Removing common words (like "the", "is", "and") that don't carry specific meaning in the analysis (depending on the specific analysis you are running).
+
+## Extract the text data from raw data {-}
+
+```{r text-processing}
+# Combine title and selftext into a single text column
+processed_data <- raw_data %>%
+  unite(col = "full_text", c(title, selftext), sep = " ", remove = FALSE, na.rm = TRUE)
+
+# what is unite doing here? try ?unite in the console to learn about it.
+
+# now let's view the combined text data
+head(processed_data$full_text)
+```
+## Tokenization {-}
+
+Next, we are going to tokenize the text data. Tokenization is the process of breaking down text into smaller units, called tokens. In this case, we will break the text into individual words. 
+
+(There are other ways to tokenize text, such as by sentences or phrases, but word tokenization is the most common for basic NLP tasks).
+
+```{r tokenization}
+# Tokenize the text data into individual words
+tokenized_data <- processed_data %>%
+  unnest_tokens(output = word, input = full_text) # unnest_tokens is a function from the tidytext package that helps with tokenization. See R documentation for what their arguments are.
+
+# see what you get from the tokenized_data 
+head(tokenized_data$word)
+
+# if you take a look at the row numbers before and after tokenization, you will see
+nrow(processed_data) # number of rows before tokenization
+nrow(tokenized_data) # number of rows after tokenization
+
+# Note that the number of rows has increased significantly after tokenization, as each word in the text now has its own row.
+```
+
+## Stop Word Removal {-}
+Next, we will remove stop words from the tokenized data. Stop words are common words that do not carry significant meaning in the context of text analysis. Examples include "the", "is", "in", "and", etc. Removing these words helps to focus on the more meaningful words in the text.
+
+```{r stop-word-removal}
+# to remove stop words, we can use the built-in stop words dataset from the tidytext package in this tutorial.
+data("stop_words")  # load the stop words dataset
+
+# let's take a look at the stop words dataset
+head(stop_words)
+
+# Remove stop words from the tokenized data
+cleaned_data <- tokenized_data %>%
+  anti_join(stop_words, by = "word")  # anti_join keeps only rows that do not have matches in the stop_words dataset
+
+# let's see how many rows we have after removing stop words
+nrow(cleaned_data)
+# you should see a significant reduction in the number of rows after removing stop words!
+
+# an optional move: you might also remove numbers and punctuation if needed
+cleaned_data <- cleaned_data %>%
+  filter(!str_detect(word, "^[0-9]+$")) %>%  
+  filter(!str_detect(word, "^[[:punct:]]+$"))
+
+# let's see the cleaned data now:
+head(cleaned_data$word) # you can see numbers are also removed if any existed
+nrow(cleaned_data) # also reflected in the row change
+```
+
+# Text Analysis {-}
+
+Now that we have processed the text data, we can move on to analyzing it. We will cover three common text analysis techniques: descriptive analysis, sentiment analysis, and topic modeling.
+
+## Descriptive Analysis {-}
+
+Descriptive analysis involves summarizing the main features of the text data. One common approach is to count the frequency of words in the text.
+
+```{r descriptive-analysis}
+# Count the frequency of each word in the cleaned data
+word_counts <- cleaned_data %>%
+  count(word, sort = TRUE)
+# View the top 10 most frequent words
+head(word_counts, 10)
+# Plot the top 10 most frequent words
+word_counts %>%
+  top_n(10) %>%
+  ggplot(aes(x = reorder(word, n), y = n)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(title = "Top 10 Most Frequent Words",
+       x = "Words",
+       y = "Frequency")
+
+# You can also create a word cloud to visualize word frequency. Larger words indicate higher frequency.
+set.seed(381) # for reproducibility, so that you see the same word cloud each time
+wordcloud(words = word_counts$word, freq = word_counts$n, max.words = 100, colors = brewer.pal(8, "Dark2"))
+```
+
+## Sentiment Analysis {-}
+
+Now, I am going to show you how to perform sentiment analysis on the text data. Sentiment analysis involves quantifying the emotional tone of the text, such as positive, negative, or neutral sentiment.
+
+How do we achieve this goal? One common approach is to use a sentiment lexicon, which is a pre-defined list of words associated with sentiment scores or categories. It is also regarded as a dictionary-based approach, as it feels like you are looking up words in a dictionary to find their sentiment values.
+
+In this tutorial, we will use the AFINN lexicon, which assigns sentiment scores to words ranging from -5 (very negative) to +5 (very positive). Lexicons are pre-defined dictionaries that map words to sentiment scores or categories. 
+
+```{r sentiment-analysis}
+# Use the AFINN lexicon for sentiment analysis
+bing_lexicon <- get_sentiments("afinn") 
+
+# Note: the first time when you download the lexicon, it may take a while as it fetches the data from the internet. You need to go to your console and type "1" to confirm the download.
+
+# You can also use "bing" (positive OR negative) or "nrc" lexicons (discrete emotion, like fear or joy), depending on your analysis needs. you can explore these lexicons in the tidytext package documentation.
+
+# Join the cleaned data with the Bing lexicon to get sentiment scores
+sentiment_data <- cleaned_data %>%
+  inner_join(bing_lexicon, by = "word")
+
+# View the sentiment data
+head(sentiment_data)
+
+# Calculate the overall sentiment score for the text data
+overall_sentiment <- sentiment_data %>%
+  summarize(total_sentiment = sum(value))
+overall_sentiment # negative score indicates overall negative sentiment in the text data.
+
+# You can also visualize the sentiment distribution across ids
+sentiment_data %>%
+  group_by(id) %>%
+  summarize(sentiment_score = sum(value)) %>%
+  ggplot(aes(x = id, y = sentiment_score)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Sentiment Score by Post ID",
+       x = "Post ID",
+       y = "Sentiment Score")
+
+# RQ: Which post has the highest positive sentiment score? Which has the most negative sentiment score?
+
+# most positive
+sentiment_data %>%
+  group_by(id) %>%
+  summarize(sentiment_score = sum(value)) %>%
+  arrange(desc(sentiment_score)) %>% # descending order of sentiment score so that the largest number comes first
+  head(1) # highest positive sentiment score
+
+# most negative
+sentiment_data %>%
+  group_by(id) %>%
+  summarize(sentiment_score = sum(value)) %>%
+  arrange(sentiment_score) %>%
+  head(1) # most negative sentiment score
+
+```
+## Topic Modeling (LDA) {-}
+
+Finally, we will explore topic modeling, which is a technique used to discover hidden topics in a collection of documents. One common approach is Latent Dirichlet Allocation (LDA), which assumes that each document is a mixture of topics and each topic is a mixture of words. 
+
+For each word, it has a probability to appear in a document, and also a probability to belong to a topic. When we observe the words in documents, we can infer the topics based on the patterns of word co-occurrence. [We are going to skip the mathematical details for now, but you can refer to the book "Text Mining with R" for more information.]
+
+Therefore, to conduct LDA topic modeling, we first need to create a Document-Term Matrix (DTM) from the cleaned text data. A DTM is a matrix where rows represent documents, columns represent terms (words), and the values indicate the frequency of each term in each document.
+
+```{r dtm}
+# Create a Document-Term Matrix (DTM) from the cleaned data
+dtm <- cleaned_data %>%
+  count(id, word) %>%
+  cast_dtm(document = id, term = word, value = n)
+
+# In this analysis, documents are individual Reddit posts. In this function execution, id is the document identifier, word is the term, and n is the frequency of the term in the document. Remember the `id` column comes from the original dataset, which identifies each Reddit post uniquely. In this analysis, documents are individual Reddit posts.
+
+# View the DTM output
+dtm
+```
+
+Now that we have the DTM, we can fit an LDA model to discover topics in the text data.
+```{r lda-modeling}
+# Fit an LDA model with 5 topics
+lda_model <- LDA(dtm, k = 5, control = list(seed = 381))
+# dtm is the document-term matrix we created earlier
+# k = number of topics; you can adjust this number based on your analysis needs. We are going to skip the parameter tuning for today.
+# control = list(seed = 381) is to ensure reproducibility; otherwise you will have different outputs each time you run the model. 
+
+# View the top terms in each topic
+lda_topics <- tidy(lda_model, matrix = "beta")
+top_terms <- lda_topics %>%
+  group_by(topic) %>%
+  top_n(10, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+# Print the top terms for each topic
+top_terms
+```
+
+How to read this output? Each topic is represented by a set of terms with associated beta values, which indicate the importance of each term within that topic. Higher beta values mean that the term is more representative of the topic. Usually, researchers interpret the topics based on the top terms associated with them.
+
+```{r lda-visualization}
+# You can visualize the top terms for each topic using ggplot2
+top_terms %>%
+  mutate(term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(x = term, y = beta, fill = factor(topic))) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free_y") +
+  coord_flip() +
+  scale_x_reordered() +
+  labs(title = "Top Terms in Each LDA Topic",
+       x = "Terms",
+       y = "Beta")
+```
+
+## Extended Learning: Topic Modeling (STM) {-}
+
+Since we now have some basic understanding of topic modeling using LDA, let's explore Structural Topic Modeling (STM). STM is an advanced topic modeling technique that allows for the inclusion of document-level metadata (covariates) in the modeling process. This enables researchers to explore how topics vary across different document characteristics.
+
+STM is one of the most widely used topic modeling variants. Its key innovation is incorporating corpus metadata (e.g., time, author, publication outlet) into the topic model.
+
+What research questions can STM answer?
+
+In the social science domain, STM has been applied across multiple empirical contexts, including but not limited to: (1) analyzing topics or frames in mass media publications, historical documents, and policy materials; (2) examining open-ended survey responses to measure citizen opinion; and (3) studying public opinion using social media data.
+
+The key goal of the STM is to allow researchers to discover latent topics while estimating their relationships with the metadata. As a result, STM enables not only descriptive questions about what themes are present in a corpus, but also inferential hypothesis testing regarding how topics vary across metadata attributes.
+
+```{r stm-modeling}
+# prepare metadata for STM
+stm_processed <- textProcessor(processed_data$full_text, 
+                              metadata = processed_data,
+                              lowercase = TRUE,
+                              striphtml = TRUE)
+stm_processed # view the processed output
+# prepare documents for STM
+out <- prepDocuments(stm_processed$documents, stm_processed$vocab, 
+                     stm_processed$meta, lower.thresh = 20)
+
+
+# run STM with 5 topics, including 'score' as a covariate
+stm_model <- stm(documents = out$documents, 
+                 vocab = out$vocab, 
+                 K = 5, 
+                 prevalence = ~ score, 
+                 data = as.data.frame(out$meta), 
+                 max.em.its = 75, 
+                 seed = 381)
+
+# what is vocab? Vocab is the vocabulary of unique terms in the corpus. In the context of STM, it refers to the set of words that are used to represent the documents in the model. The vocab parameter is essential for defining the terms that will be analyzed and associated with topics.
+
+# View the top terms in each topic
+stm_topics <- tidy(stm_model)
+top_stm_terms <- stm_topics %>%
+  group_by(topic) %>%
+  top_n(10, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+# Print the top terms for each topic
+top_stm_terms
+```
+
+Since we do not have time to go into details of STM, I encourage you to explore the STM package documentation and the original paper by Roberts et al. (2014) for a deeper understanding of the methodology and its applications. For a more detailed tutorial to practice on STM, see [J381 Textbook chapter on STM](https://jolukito.quarto.pub/j381m-textbook/94-stm.html). 
+
+
+
+
+
