@@ -1,0 +1,325 @@
+---
+title: "Text Analysis (2): Supervised Machine Learning"
+subtitle: "J381M Week 5 Tutorial - Live Coding Version"
+date: "February 12, 2026"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: cosmo
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, 
+                      fig.width = 8, fig.height = 5)
+```
+
+# Setup (Done Before Class)
+
+```{r load-packages}
+library(tidyverse)
+library(tidytext)
+library(textrecipes)
+library(tidymodels)
+```
+
+---
+
+# Part 3: Load and Prepare Data
+
+## Load Dataset
+
+```{r load-data}
+# Load the Amazon Reviews CSV file
+# File should be in the same folder as this RMD
+
+
+
+
+
+
+```
+
+## Clean Data
+
+```{r clean-data}
+# Clean the data:
+# 1. Rename columns
+# 2. Extract numeric rating
+# 3. Filter valid data
+# 4. Add word_count and sentiment columns
+
+
+
+
+
+
+
+
+
+
+```
+
+## Prepare Datasets
+
+```{r prepare-datasets}
+# Create two datasets:
+# 1. Classification: Remove neutral, keep positive/negative
+# 2. Regression: Keep all ratings
+
+# CLASSIFICATION
+
+
+
+
+# REGRESSION
+
+
+
+```
+
+---
+
+# Part 4: CLASSIFICATION - Live Coding
+
+## Visualize
+
+```{r viz-class}
+# Visualize class distribution
+
+
+
+
+
+
+```
+
+## Split Data
+
+```{r split-class}
+# Split 75-25 with stratification
+# Hint: initial_split(data, prop = 0.75, strata = sentiment)
+
+
+
+
+
+
+```
+
+## Step 1: Preprocessing
+
+```{r preprocess-class}
+# Set up text preprocessing:
+# - recipe(sentiment ~ review_text)
+# - step_tokenize()
+# - step_stopwords()
+# - step_tokenfilter(max_tokens = 1000)
+# - step_tfidf()
+
+
+
+
+
+
+
+
+```
+
+## Step 2: Model
+
+```{r model-class}
+# Choose logistic regression
+# - logistic_reg()
+# - set_engine("glm")
+# - set_mode("classification")
+
+
+
+
+
+```
+
+## Step 3: Train
+
+```{r train-class}
+# Combine preprocessing + model
+# - workflow()
+# - add_recipe()
+# - add_model()
+# - fit()
+
+
+
+
+
+
+
+
+```
+
+## Step 4: Predict
+
+```{r predict-class}
+# Make predictions on test set
+# - predict(new_data = test_class)
+# - bind_cols(test_class)
+
+
+
+
+
+```
+
+## Step 5: Evaluate
+
+```{r eval-class}
+# Create confusion matrix
+# - conf_mat(truth = sentiment, estimate = .pred_class)
+
+
+
+
+# Calculate metrics
+# - metrics(truth = sentiment, estimate = .pred_class)
+
+
+
+
+# Compare to baseline
+
+
+
+```
+
+## Step 6: Feature Importance
+
+```{r importance-class}
+# Extract coefficients and visualize
+# - extract_fit_parsnip()
+# - tidy()
+# - filter term != Intercept
+# - slice_max(abs_estimate)
+
+
+
+
+
+
+
+
+
+```
+
+---
+
+# Part 5: REGRESSION - Live Coding
+
+## Visualize
+
+```{r viz-reg}
+# Visualize rating distribution
+
+
+
+
+
+
+```
+
+## Split Data
+
+```{r split-reg}
+# Split 75-25 for regression
+
+
+
+
+
+
+```
+
+## Step 1: Preprocessing
+
+```{r preprocess-reg}
+# Same preprocessing as classification
+# But predict rating (numeric) instead of sentiment
+
+
+
+
+
+
+
+
+```
+
+## Step 2: Model
+
+```{r model-reg}
+# Choose linear regression
+# - linear_reg()
+# - set_engine("lm")
+# - set_mode("regression")
+
+
+
+
+
+```
+
+## Step 3: Train
+
+```{r train-reg}
+# Combine preprocessing + model
+# - workflow()
+# - add_recipe()
+# - add_model()
+# - fit()
+
+
+
+
+
+
+
+
+```
+
+## Step 4: Predict
+
+```{r predict-reg}
+# Make predictions on test set
+
+
+
+
+
+```
+
+## Step 5: Evaluate
+
+```{r eval-reg}
+# Calculate metrics
+# - metrics(truth = rating, estimate = .pred)
+
+
+
+
+# Visualize predicted vs actual
+# - ggplot with geom_jitter and geom_abline
+
+
+
+
+
+
+
+
+```
+
+---
+
+*Tutorial by Sungwon Jung, J381M 2026*

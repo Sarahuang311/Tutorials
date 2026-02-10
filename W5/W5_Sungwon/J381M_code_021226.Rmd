@@ -1,0 +1,885 @@
+---
+title: "Text Analysis (2): Supervised Machine Learning"
+subtitle: "J381M Week 5 Tutorial - Instructor Version"
+author: "Instructor: Sungwon Jung"
+date: "February 12, 2026"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: cosmo
+    highlight: tango
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, 
+                      fig.width = 8, fig.height = 5)
+```
+
+# Before We Begin: Setup
+
+## Install Required Packages
+
+Students should have done this BEFORE class:
+
+```{r install-packages, eval=FALSE}
+install.packages(c(
+  "tidyverse",
+  "tidytext",
+  "tidymodels",
+  "textrecipes",
+  "stopwords"
+))
+```
+
+## Load Packages
+
+```{r load-packages, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(tidytext)
+library(textrecipes)
+library(tidymodels)
+
+cat("Packages loaded!\n")
+```
+
+## Quick Test
+
+```{r test-setup}
+test_data <- tibble(
+  text = c("I love this", "This is bad", "Pretty good"),
+  rating = c(5, 1, 4)
+)
+
+test_data %>% 
+  unnest_tokens(word, text) %>%
+  head()
+
+cat("\nEverything works!\n")
+```
+
+---
+
+# Part 1: Core ML Principles
+
+## What is Supervised Learning?
+
+**KEY CONCEPT:** Supervised Learning = Learning from labeled examples
+
+- Like learning with flashcards: Front (review text) → Back (correct answer)
+- The machine learns patterns from examples WE provide
+- It's "supervised" because WE tell it what the correct answers are
+
+**Real-world analogy:** Teaching a child to identify animals by showing pictures and saying "this is a dog", "this is a cat"
+
+## Two Main Tasks
+
+### 1. Classification (Predicting Categories)
+
+**What SML does:** Learns rules to put things into categories
+
+**Examples:**
+- Is this review positive or negative?
+- Is this email spam or not spam?
+- Which topic does this article discuss?
+
+**Output:** Labels/categories (positive, negative, spam, politics, sports)
+
+**Today we'll do:** Positive vs Negative sentiment
+
+### 2. Regression (Predicting Numbers)
+
+**What SML does:** Learns rules to predict a number
+
+**Examples:**
+- What rating (1-5 stars) will this review give?
+- How much will this house sell for?
+
+**Output:** Continuous numbers (3.7 stars, $450,000)
+
+
+## Train/Test Split
+
+**CRITICAL CONCEPT:** Never test on data you trained on!
+
+**Explain with analogy:** 
+- Would you study for an exam using the exact same questions that will be on the test? 
+- That's memorization, not learning!
+- Same with ML - we need to test on NEW data the model hasn't seen
+
+```
+Total Data (100%)
+│
+├─ Training Set (75%)    ← Model learns patterns here
+└─ Test Set (25%)        ← Evaluate on NEW data here
+```
+
+**Why 75/25?**
+- **75% training**: Need enough data to learn good patterns
+- **25% testing**: Need enough data to reliably evaluate
+- Common standard in ML (also see 80/20, 70/30)
+- Balance: More training = better learning, but need enough test data for evaluation
+
+**IMPORTANT:** Test set is LOCKED AWAY until final evaluation. Never touch it during training!
+
+### Dealing with Imbalanced Data
+
+**Real-world problem:** Classes often unequal (e.g., 71% negative, 29% positive)
+
+**Why it matters:**
+- A "dumb" model that always predicts the majority class gets 71% accuracy!
+- Our model must do BETTER than this baseline
+
+**Solution: Stratified Sampling**
+- Keep same proportions in both train and test sets
+- If data is 70/30, training is also 70/30, test is also 70/30
+
+**Mathematical principles:** (Beyond today's scope, but important to know)
+- Prevents biased evaluation
+- Ensures representative samples
+- Critical for real-world applications
+
+**What we'll do:** Use `strata = sentiment` parameter to maintain proportions
+
+---
+
+# Part 2: Text as Features
+
+## The Problem
+
+Computers don't understand words - they only understand numbers!
+
+**We need to convert:** "This product is amazing!" → [0.3, 0.8, 0.0, 0.9, ...]
+
+## The Pipeline (Quick Review)
+
+```
+"This product is amazing!" 
+    ↓ TOKENIZATION (split into words)
+["This", "product", "is", "amazing"]
+    ↓ REMOVE STOP WORDS (remove common words)
+["product", "amazing"]
+    ↓ VECTORIZATION (convert to numbers)
+[product: 1, amazing: 1, ...]
+```
+
+### Key Concepts
+
+**1. Tokenization:** Split text into individual words
+
+**2. Stop Words:** Common words with little meaning
+- Examples: "the", "a", "is", "and"
+- We covered this last week!
+
+**3. Vectorization:** Converting words to numbers
+- **Simplest:** Count how many times each word appears
+- **Better:** TF-IDF (what we'll use today)
+
+### TF-IDF (Important but Technical)
+
+**Explain simply:**
+- TF (Term Frequency): How often does this word appear in THIS review?
+- IDF (Inverse Document Frequency): How rare is this word ACROSS ALL reviews?
+- TF-IDF = TF × IDF: Highlights words that are frequent in one review but rare overall
+
+**Example:**
+- "amazon" appears in EVERY review → Low TF-IDF (not useful for classification)
+- "excellent" appears ONLY in positive reviews → High TF-IDF (very useful!)
+
+
+---
+
+# Part 3: Loading and Preparing Data
+
+## Load Dataset
+
+**What we're doing:** Loading Amazon reviews from CSV
+
+```{r load-data}
+amazon_reviews_raw <- read_csv(
+  "Amazon_Reviews.csv",
+  col_types = cols(
+    `Reviewer Name` = col_character(),
+    Country = col_character(),
+    Rating = col_character(),
+    `Review Title` = col_character(),
+    `Review Text` = col_character(),
+    .default = col_character()
+  )
+)
+
+cat("Total reviews:", nrow(amazon_reviews_raw), "\n")
+```
+
+"We have about 21,000 customer reviews of Amazon.com service"
+
+## Clean Data
+
+**What we're doing:** Preparing data for analysis
+
+```{r clean-data}
+amazon_reviews_clean <- amazon_reviews_raw %>%
+  rename(
+    rating_text = Rating,
+    review_text = `Review Text`
+  ) %>%
+  mutate(rating = as.numeric(str_extract(rating_text, "\\d+"))) %>%
+  filter(
+    !is.na(review_text),
+    review_text != "",
+    !is.na(rating),
+    rating >= 1 & rating <= 5
+  ) %>%
+  mutate(
+    word_count = str_count(review_text, "\\w+"),
+    sentiment = case_when(
+      rating >= 4 ~ "positive",
+      rating <= 2 ~ "negative",
+      TRUE ~ "neutral"
+    )
+  )
+
+cat("After cleaning:", nrow(amazon_reviews_clean), "reviews\n")
+```
+
+**Explain quickly:**
+- Extract rating number (1-5) from text
+- Remove empty/invalid reviews
+- Count words in each review
+- Create sentiment labels: 4-5 stars = positive, 1-2 = negative, 3 = neutral
+
+## Prepare Datasets
+
+**What we're doing:** Creating two versions of data
+
+```{r prepare-datasets}
+# CLASSIFICATION: Binary sentiment (pos vs neg)
+amazon_classification <- amazon_reviews_clean %>%
+  filter(sentiment != "neutral") %>%
+  mutate(sentiment = factor(sentiment, levels = c("negative", "positive"))) %>%
+  select(review_text, sentiment, rating, word_count)
+
+# REGRESSION: Predict rating (1-5) - for self-learning
+amazon_regression <- amazon_reviews_clean %>%
+  select(review_text, rating, sentiment, word_count)
+
+cat("Classification dataset:", nrow(amazon_classification), "reviews\n")
+cat("Regression dataset:", nrow(amazon_regression), "reviews\n")
+```
+
+
+- Classification: Remove 3-star (neutral) reviews - focus on clear positive/negative
+- Regression: Keep all ratings - will use for self-learning later
+
+## Example Reviews
+
+Example reviews:
+
+```{r examples}
+set.seed(2025)
+
+cat("=== POSITIVE Examples ===\n\n")
+amazon_classification %>%
+  filter(sentiment == "positive") %>%
+  slice_sample(n = 2) %>%
+  pull(review_text) %>%
+  str_trunc(200) %>%
+  paste0(1:2, ". ", .) %>%
+  cat(sep = "\n\n")
+
+cat("\n\n=== NEGATIVE Examples ===\n\n")
+amazon_classification %>%
+  filter(sentiment == "negative") %>%
+  slice_sample(n = 2) %>%
+  pull(review_text) %>%
+  str_trunc(200) %>%
+  paste0(1:2, ". ", .) %>%
+  cat(sep = "\n\n")
+```
+
+
+---
+
+# Part 4: CLASSIFICATION
+
+
+
+## Train/Test Split
+
+**CRITICAL CONCEPT:** Never test on data you trained on!
+
+**Explain with analogy:** 
+- Would you study for an exam using the exact same questions that will be on the test? 
+- That's memorization, not learning!
+- Same with ML - we need to test on NEW data the model hasn't seen
+
+```
+Total Data (100%)
+│
+├─ Training Set (75%)    ← Model learns patterns here
+└─ Test Set (25%)        ← Evaluate on NEW data here
+```
+
+**Why 75/25?**
+- **75% training**: Need enough data to learn good patterns
+- **25% testing**: Need enough data to reliably evaluate
+- Common standard in ML (also see 80/20, 70/30)
+- Balance: More training = better learning, but need enough test data for evaluation
+
+**IMPORTANT:** Test set is LOCKED AWAY until final evaluation. Never touch it during training!
+
+### Dealing with Imbalanced Data
+
+**Real-world problem:** Classes often unequal (e.g., 71% negative, 29% positive)
+
+**Why it matters:**
+- A "dumb" model that always predicts the majority class gets 71% accuracy!
+- Our model must do BETTER than this baseline
+
+**Solution: Stratified Sampling**
+- Keep same proportions in both train and test sets
+- If data is 70/30, training is also 70/30, test is also 70/30
+
+**Mathematical principles:** (Beyond today's scope, but important to know)
+- Prevents biased evaluation
+- Ensures representative samples
+- Critical for real-world applications
+
+**What we'll do:** Use `strata = sentiment` parameter to maintain proportions
+
+---
+
+## Visualize the Data
+
+**Why visualize:** Need to understand our data before building a model
+
+```{r viz-class}
+# Class distribution
+ggplot(amazon_classification, aes(x = sentiment, fill = sentiment)) +
+  geom_bar() +
+  geom_text(stat = "count", aes(label = after_stat(count)), vjust = -0.5, size = 5) +
+  labs(title = "Classification: Class Distribution",
+       subtitle = "Predicting positive vs negative sentiment",
+       x = NULL, y = "Count") +
+  scale_fill_manual(values = c("negative" = "#F44336", "positive" = "#4CAF50")) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Check class balance
+class_dist <- amazon_classification %>% 
+  count(sentiment) %>% 
+  mutate(pct = round(n/sum(n)*100, 1))
+
+print(class_dist)
+
+neg_count <- class_dist %>% filter(sentiment == "negative") %>% pull(n)
+pos_count <- class_dist %>% filter(sentiment == "positive") %>% pull(n)
+imbalance_ratio <- round(neg_count / pos_count, 1)
+```
+
+**CLASS IMBALANCE DETECTED!**
+
+- **Ratio**: `r imbalance_ratio` : 1 (negative : positive)
+- **Negative**: `r round(class_dist$pct[1], 1)`% | **Positive**: `r round(class_dist$pct[2], 1)`%
+
+- Our data is imbalanced: More negative reviews than positive
+- A "dumb" model that always says "negative" gets `r round(class_dist$pct[1], 1)`% accuracy
+- Our model MUST beat this baseline!
+- We'll use stratified sampling to handle this
+
+```{r viz-class2}
+# Feature: Review length by sentiment
+ggplot(amazon_classification, aes(x = sentiment, y = word_count, fill = sentiment)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(title = "Feature: Review Length by Sentiment",
+       x = NULL, y = "Word Count") +
+  scale_fill_manual(values = c("negative" = "#F44336", "positive" = "#4CAF50")) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+
+## Split Data
+
+**What we're doing:** Splitting data into training (75%) and testing (25%)
+
+**Key functions:**
+- `initial_split()` - from tidymodels package
+- `training()` - extract training data
+- `testing()` - extract testing data
+
+```{r split-class}
+set.seed(2025)
+
+split_class <- initial_split(
+  amazon_classification,
+  prop = 0.75,
+  strata = sentiment
+)
+
+train_class <- training(split_class)
+test_class <- testing(split_class)
+
+cat("Training:", nrow(train_class), "| Test:", nrow(test_class), "\n")
+train_class %>% count(sentiment)
+```
+
+Each parameter:
+- `prop = 0.75`: Put 75% in training, 25% in testing
+- `strata = sentiment`: Maintains the 71/29 negative/positive ratio in BOTH sets
+- `set.seed(2025)`: Makes split reproducible (everyone gets same split)
+
+**Why 75/25?**
+- **75% training**: Need enough data for model to learn good patterns
+- **25% testing**: Need enough data to reliably evaluate performance
+- Standard practice in machine learning
+- Could also use 80/20 or 70/30
+
+**Check stratification worked:**
+
+```{r check-strata}
+cat("Training set distribution:\n")
+train_class %>% count(sentiment) %>% mutate(pct = round(n/sum(n)*100, 1)) %>% print()
+
+cat("\nTest set distribution:\n")
+test_class %>% count(sentiment) %>% mutate(pct = round(n/sum(n)*100, 1)) %>% print()
+```
+
+
+## Step 1: Text Preprocessing
+
+**What we're doing:** Defining HOW to convert text to numbers
+
+**Key function:** `recipe()` - from tidymodels/textrecipes packages
+
+**Explain the concept:** 
+"A recipe is like a cooking recipe - it lists all the steps to transform raw ingredients (text) into a finished dish (numbers the model can use)"
+
+```{r preprocess-class}
+preprocess_class <- recipe(sentiment ~ review_text, data = train_class) %>%
+  step_tokenize(review_text) %>%
+  step_stopwords(review_text) %>%
+  step_tokenfilter(review_text, max_tokens = 1000) %>%
+  step_tfidf(review_text)
+
+preprocess_class
+```
+
+Each step:
+
+1. `recipe(sentiment ~ review_text)`: 
+   - Formula: predict sentiment FROM review_text
+   - Read as: "sentiment is predicted by review_text"
+
+2. `step_tokenize(review_text)`:
+   - Splits text into individual words
+   - "I love this" → ["I", "love", "this"]
+
+3. `step_stopwords(review_text)`:
+   - Removes common words like "the", "a", "is"
+   - ["I", "love", "this"] → ["love"]
+
+4. `step_tokenfilter(review_text, max_tokens = 1000)`:
+   - Keeps only the 1000 most frequent words
+   - Reduces noise and computation time
+   - "Why 1000?" - Balance between information and efficiency
+
+5. `step_tfidf(review_text)`:
+   - Calculates TF-IDF weights (importance scores)
+   - Words unique to one class get higher weight
+
+**Important:** This recipe is NOT applied yet - it's just a plan!
+
+## Step 2: Choose Model
+
+**What we're doing:** Choosing the algorithm to use
+
+**Key function:** `logistic_reg()` - from tidymodels/parsnip package
+
+```{r model-class}
+model_class <- logistic_reg() %>%
+  set_engine("glm") %>%
+  set_mode("classification")
+
+model_class
+```
+
+Each component:
+
+1. `logistic_reg()`:
+   - Logistic Regression - a classification algorithm
+   - Good for binary outcomes (positive vs negative)
+   - Predicts PROBABILITY of each class
+
+2. `set_engine("glm")`:
+   - **glm** = Generalized Linear Model
+   - The specific R function that will do the math
+   - Other options: glmnet, keras, etc.
+   - glm is simple and fast - good for learning!
+
+3. `set_mode("classification")`:
+   - Tells model we're predicting CATEGORIES (not numbers)
+   - For regression, we'd use `"regression"`
+
+**Why logistic regression?**
+- Simple and interpretable
+- Fast to train
+- Works well for text classification
+- Industry standard for baseline models
+
+## Step 3: Train the Model
+
+**What we're doing:** Combining preprocessing + model and training it
+
+**Key concept: WORKFLOW**
+- Bundles preprocessing recipe + model together
+- Ensures preprocessing is applied consistently
+- Makes it easy to apply same steps to new data
+
+**Key functions:**
+- `workflow()` - from tidymodels package
+- `add_recipe()` - adds preprocessing steps
+- `add_model()` - adds model specification
+- `fit()` - actually trains the model
+
+```{r train-class}
+# Create workflow
+pipeline_class <- workflow() %>%
+  add_recipe(preprocess_class) %>%
+  add_model(model_class)
+
+pipeline_class
+```
+
+The workflow:
+
+1. `workflow()`:
+   - Creates empty workflow container
+   - Think of it as an empty pipeline
+
+2. `add_recipe(preprocess_class)`:
+   - Adds our preprocessing steps
+   - Remember: tokenize → remove stop words → filter → TF-IDF
+
+3. `add_model(model_class)`:
+   - Adds our logistic regression model
+   - Now pipeline knows: preprocessing + what model to use
+
+**Now train it:**
+
+```{r fit-class}
+fit_class <- pipeline_class %>%
+  fit(data = train_class)
+
+cat("Classification model trained!\n")
+```
+
+What fit() does:
+- Takes our workflow (preprocessing + model)
+- Applies it to training data
+- Model LEARNS patterns from the data
+- This is where the "learning" happens!
+- May take 10-30 seconds depending on computer
+
+**What happened:**
+1. Converted all training reviews to TF-IDF vectors
+2. Logistic regression found patterns: which words predict positive? negative?
+3. Model now "knows" these patterns
+4. Ready to make predictions on NEW data!
+
+## Step 4: Make Predictions
+
+**What we're doing:** Using trained model to predict sentiment on TEST data
+
+**Key function:** `predict()` - from tidymodels package
+
+```{r predict-class}
+pred_class <- fit_class %>%
+  predict(new_data = test_class) %>%
+  bind_cols(test_class)
+
+# View some predictions
+pred_class %>%
+  select(review_text, sentiment, .pred_class) %>%
+  slice_sample(n = 10)
+```
+
+Each part:
+
+1. `predict(new_data = test_class)`:
+   - Applies model to NEW data (test set)
+   - Returns predictions in column `.pred_class`
+   - Model has NEVER seen this data before!
+
+2. `bind_cols(test_class)`:
+   - Attaches original data (actual sentiment)
+   - So we can compare predicted vs actual
+
+3. Columns in result:
+   - `sentiment`: ACTUAL label (ground truth)
+   - `.pred_class`: PREDICTED label (model's guess)
+   - `review_text`: The actual review
+
+
+## Step 5: Evaluate Performance
+
+**What we're doing:** Measuring how well our model performs
+
+### Confusion Matrix
+
+**Key function:** `conf_mat()` - from yardstick package (part of tidymodels)
+
+```{r confusion-matrix}
+conf_mat_class <- pred_class %>%
+  conf_mat(truth = sentiment, estimate = .pred_class)
+
+print(conf_mat_class)
+
+autoplot(conf_mat_class, type = "heatmap") +
+  labs(title = "Confusion Matrix - Sentiment Classification") +
+  theme_minimal()
+```
+
+The confusion matrix:
+
+```
+                 Predicted
+                 negative  positive
+Actual negative    [TN]      [FP]
+       positive    [FN]      [TP]
+```
+
+**Four outcomes:**
+1. **True Negative (TN)**: Predicted negative, actually negative ✓
+2. **False Positive (FP)**: Predicted positive, actually negative ✗ (Type I error)
+3. **False Negative (FN)**: Predicted negative, actually positive ✗ (Type II error)
+4. **True Positive (TP)**: Predicted positive, actually positive ✓
+
+
+### Performance Metrics
+
+```{r metrics}
+metrics_class <- pred_class %>%
+  metrics(truth = sentiment, estimate = .pred_class)
+
+print(metrics_class)
+
+accuracy <- metrics_class %>% filter(.metric == "accuracy") %>% pull(.estimate)
+cat("\nOverall Accuracy:", round(accuracy * 100, 2), "%\n")
+```
+
+Each metric:
+
+1. **Accuracy**: (TP + TN) / Total
+   - What % of predictions were correct?
+   - Easy to understand, but can be misleading with imbalanced data!
+
+2. **Kappa**: Agreement beyond chance
+   - Adjusts for class imbalance
+   - Better metric for imbalanced data
+
+**But wait! Compare to baseline:**
+
+```{r baseline-comparison}
+baseline_accuracy <- neg_count / (neg_count + pos_count)
+cat("\n=== Baseline Comparison ===\n")
+cat("Baseline (always predict negative):", round(baseline_accuracy * 100, 2), "%\n")
+cat("Our model:", round(accuracy * 100, 2), "%\n")
+cat("Improvement:", round((accuracy - baseline_accuracy) * 100, 2), "percentage points\n")
+```
+
+
+### Class-Specific Metrics
+
+**Why important:** With imbalanced data, accuracy can be misleading
+
+```{r class-metrics}
+class_metrics <- pred_class %>%
+  precision(truth = sentiment, estimate = .pred_class) %>%
+  bind_rows(pred_class %>% recall(truth = sentiment, estimate = .pred_class)) %>%
+  bind_rows(pred_class %>% f_meas(truth = sentiment, estimate = .pred_class))
+
+print(class_metrics)
+```
+
+Each metric:
+
+1. **Precision**: Of all positive predictions, how many were actually positive?
+   - Precision = TP / (TP + FP)
+   - "When I say positive, am I usually right?"
+
+2. **Recall**: Of all actual positives, how many did we catch?
+   - Recall = TP / (TP + FN)
+   - "Did I find all the positive reviews?"
+
+3. **F1-Score**: Harmonic mean of precision and recall
+   - Balances precision and recall
+   - Good single metric for imbalanced data
+
+**Trade-off:** High precision vs high recall
+- High precision: Few false positives (conservative)
+- High recall: Few false negatives (liberal)
+
+## Step 6: Feature Importance
+
+**What we're doing:** Understanding WHICH words the model thinks are important
+
+**Why important:**
+- Shows what the model learned
+- Helps interpret predictions
+- Can reveal biases or unexpected patterns
+
+**Key function:** `extract_fit_parsnip()` then `tidy()` - from broom package
+
+```{r importance-class}
+coefs <- fit_class %>%
+  extract_fit_parsnip() %>%
+  tidy() %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    term = str_remove(term, "tfidf_review_text_"),
+    abs_estimate = abs(estimate)
+  )
+
+# Top 20 most important words
+top20 <- coefs %>% slice_max(abs_estimate, n = 20)
+
+ggplot(top20, aes(x = reorder(term, estimate), y = estimate, fill = estimate > 0)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Most Important Words for Classification",
+       subtitle = "Green = Positive indicators | Red = Negative indicators",
+       x = "Word", y = "Coefficient (Importance)") +
+  scale_fill_manual(values = c("TRUE" = "#4CAF50", "FALSE" = "#F44336")) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+cat("\n=== Top Positive Words ===\n")
+coefs %>% slice_max(estimate, n = 5) %>% select(term, estimate) %>% print()
+
+cat("\n=== Top Negative Words ===\n")
+coefs %>% slice_min(estimate, n = 5) %>% select(term, estimate) %>% print()
+```
+
+Understanding coefficients:
+
+1. **Positive coefficient**: Word increases probability of positive sentiment
+   - "excellent" has positive coefficient → indicates positive review
+
+2. **Negative coefficient**: Word decreases probability of positive sentiment (increases negative)
+   - "terrible" has negative coefficient → indicates negative review
+
+3. **Magnitude**: How strong the effect is
+   - Larger absolute value = more important for classification
+
+- "Do these words make sense?"
+- "Any surprises?"
+- "What does this tell us about customer reviews?"
+
+**Important insight:** The model learned patterns from data, not pre-programmed rules!
+
+---
+
+# Part 5: REGRESSION (Optional - Self-Learning)
+
+**What's different:**
+- Predict rating (1-5) instead of sentiment (positive/negative)
+- Use `linear_reg()` instead of `logistic_reg()`
+- Evaluate with RMSE and R² instead of accuracy
+
+```{r regression-quick}
+set.seed(2025)
+split_reg <- initial_split(amazon_regression, prop = 0.75)
+train_reg <- training(split_reg)
+test_reg <- testing(split_reg)
+
+preprocess_reg <- recipe(rating ~ review_text, data = train_reg) %>%
+  step_tokenize(review_text) %>%
+  step_stopwords(review_text) %>%
+  step_tokenfilter(review_text, max_tokens = 1000) %>%
+  step_tfidf(review_text)
+
+model_reg <- linear_reg() %>%
+  set_engine("lm") %>%
+  set_mode("regression")
+
+pipeline_reg <- workflow() %>%
+  add_recipe(preprocess_reg) %>%
+  add_model(model_reg)
+
+fit_reg <- pipeline_reg %>%
+  fit(data = train_reg)
+
+pred_reg <- fit_reg %>%
+  predict(new_data = test_reg) %>%
+  bind_cols(test_reg)
+
+metrics_reg <- pred_reg %>%
+  metrics(truth = rating, estimate = .pred)
+
+print(metrics_reg)
+```
+
+- **RMSE**: Average prediction error in stars (lower is better)
+- **R²**: How much variance explained (higher is better, max = 1.0)
+
+**Show plot:**
+
+```{r regression-viz}
+ggplot(pred_reg, aes(x = rating, y = .pred)) +
+  geom_jitter(alpha = 0.3, width = 0.2) +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed") +
+  labs(title = "Regression: Predicted vs Actual Ratings",
+       subtitle = "Red line = perfect predictions") +
+  theme_minimal()
+```
+
+
+---
+
+# Wrap-up
+
+## Key Takeaways
+
+**What we learned today:**
+
+1. **Supervised Learning**: Learning from labeled examples
+2. **Classification**: Predicting categories (positive vs negative)
+3. **Train/Test Split**: Never test on training data! (75/25 split)
+4. **Text Preprocessing**: Tokenize → Stop words → TF-IDF
+5. **Evaluation**: Confusion matrix, accuracy, precision, recall
+6. **Feature Importance**: Understanding what the model learned
+
+## The Big Picture
+
+**What SML does:**
+- Provides automated approach to process text as humans would manually
+- Machine learns RULES (patterns) that we define
+- Applies these rules to classification/regression tasks
+
+**How to apply SML:**
+1. Label some data (or use pre-labeled data)
+2. Split into train/test sets
+3. Define preprocessing steps
+4. Train model on training data
+5. Evaluate on test data
+6. Interpret results
+
+## Next Steps
+
+- Try with your own text data!
+- Experiment with different preprocessing (more/fewer tokens)
+- Try different models (Random Forest, SVM)
+- Learn about cross-validation for more robust evaluation
+
+## Resources
+
+- [Tidymodels](https://www.tidymodels.org/)
+- [Text Mining with R](https://www.tidytextmining.com/)
+- [Supervised ML for Text](https://smltar.com/)
+
+---
+
+*Tutorial by Sungwon Jung, J381M 2026*
