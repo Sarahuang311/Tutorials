@@ -1,0 +1,304 @@
+---
+title: "J381M_H06_network"
+author: "Shengchun Huang"
+date: "2026-02-19"
+output: 
+  html_document:
+    code_folding: show
+    highlight: haddock
+    number_sections: yes
+    theme: lumen
+    toc: yes
+    toc_depth: 4
+    toc_float: yes
+urlcolor: blue
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+# this is the chunk for setting up the environment. It will not be included in the final output (include=FALSE). Run it before you run the following chunks.
+knitr::opts_chunk$set(echo = TRUE, fig.width=8, fig.height=4)
+options(scipen = 0, digits = 3)  # controls base R output
+```
+
+\pagebreak
+
+# Objectives {-}
+
+Welcome back to J381M! Today we will learn how to analyze networks in R. We will use the `igraph` package, which is a powerful tool for network analysis. By the end of this session, you should be able to (1) understand basic structures of a network, (2) construct and visualize a network, (3) understand centrality measures, and (4) identify communities in a network. 
+
+Content of today:
+
+0. Set-up: 
+    + Start a new R script in R studio in your j381m project folder and clean the environment before you start (use `rm = list (ls())`)
+    + Install and library required packages, `igraph` 
+
+1. Network basics:
+    + Nodes and edges
+    + Ego and neighbors
+    + Degree
+
+2. Centrality:
+    + Degree centrality
+    + Betweenness centrality
+    + Extended content: closeness centrality and eigenvector centrality
+
+Let's get started!
+
+# Basic concepts of networks {-}
+
+A network is a collection of nodes (also called vertices) and edges (also called ties) that connect pairs of nodes. Networks can have various properties such as degree, centrality, and clustering. These properties can help us understand the structure and dynamics of the network, as well as the roles of individual nodes within it.
+
+Before we dive into the analysis, let's briefly review some basic concepts of networks:
+
+## Nodes and edges {-}
+
+- **Node (Vertex)**: An individual entity in the network, such as a person, organization, or concept.
+- **Edge (Tie)**: A connection between two nodes, which can represent a relationship, interaction, or association.
+
+In today's practice, we will use the characters in the TV show "Game of Thrones" as our nodes, and the relationships between them as our edges.
+
+
+![](got_image.jpg)
+
+```{r read data, message=F}
+library(igraph) # Using the package of "igraph" for networks in R.
+GoT <- read.csv("GoT_unweighted.csv")
+head(GoT) 
+```
+
+- 'Source': the start node; 
+- 'Target': the end node.
+- This is a list of edge: Each row defines an edge.
+- Directions of edges are not specified in this data. (This is an undirected network.)
+
+Quick question: How many edges are there in this network?
+
+Now, we can create a graph object from the edge list and visualize it. (Think about it in an alternative way: as long as you can establish a relationship between two nodes, you can put the two nodes in the two columns and create the edge list.) 
+
+```{r visual}
+# creates a graph from the edge list
+g <- graph_from_edgelist(as.matrix(GoT), # rearranging the data as matrix 
+                          directed = F) # directions are not specified
+g # "g" here is the graph object. You can check its properties by using the summary function.
+summary(g)
+
+# visualization
+png(filename = "GoT.png", width = 1600, height = 1400) ## save it to png
+
+plot(g, # the graph object
+     vertex.size = 5, # size of nodes
+     vertex.color = "pink", # color of nodes
+     vertex.label.cex = 1, # size of labels
+     vertex.label.color = "black", # color of labels
+     layout = layout.fruchterman.reingold) # layout of the graph
+
+dev.off() ## end of the output
+
+# optionally, you can also save it to pdf format, which is more suitable for printing.
+pdf(file = "GoT_Network.pdf", width = 11, height = 8.5)
+plot(g, # the graph object
+     vertex.size = 5, # size of nodes
+     vertex.color = "pink", # color of nodes
+     vertex.label.cex = 0.3, # size of labels
+     vertex.label.color = "black", # color of labels
+     layout = layout.fruchterman.reingold) # layout of the graph
+dev.off() ## end of the output
+
+# note: you can check other arguments of the plot function to customize your network visualization. For example, you can change the width of the edge, the color of the edge, and the direction of the edge etc. These prospensities may represent different variables in your study. You can also use other layout algorithms to visualize the network. The choice of layout depends on the structure of the network and your preference.
+```
+## Task: find Jon Snow {-}
+
+Here is a small task for you. Can you locate the node labeled “Jon” in the network?
+
+```{r jon, message=F}
+# take a closer look at the network
+V(g) # V() is the function to extract the vertices of the graph. It returns a vertex sequence, which is a list of all the nodes in the graph. Each node has an attribute called "name", which is the label of the node. We can use this attribute to locate the node labeled "Jon".
+
+b <- V(g) # we want to give a name to this vertex project
+
+match("Jon", b$name) # Locate the node labeled “Jon”. 
+```
+```{r jon2, message=F, warning=F}
+# can you try to find Jon in the visualization? (hint: by changing the color of this node particularly)
+node_colors <- ifelse(V(g)$name == "Jon", "red", "pink") # can you try to read out loud what this line is saying?
+
+pdf(file = "GoT_Network_2.pdf", width = 11, height = 8.5)
+plot(g, 
+     vertex.size = 5, 
+     vertex.color = node_colors, # here we change "pink" to the predefined "node_colors", which will color Jon in red and the rest in pink
+     vertex.label.cex = 0.3, 
+     vertex.label.color = "black", 
+     layout = layout.fruchterman.reingold) 
+dev.off()
+```
+
+## Ego and neighbors {-}
+
+To understand the structure of a network, it is also important to analyze the relationships between nodes. In network analysis, we often use the terms "ego" and "neighbors" to describe the local structure around a node.
+
+- **Ego** and **Neighbors**: The set of nodes that are directly connected to a given node (the "ego"). The ego is the focal node, and the neighbors are the nodes that are directly connected to it.
+
+After locating Jon, we can also find out who are his neighbors (the nodes that are directly connected to him) and how many connections he has (the degree of the node).
+
+```{r ego, message=F}
+ego_j <- ego(g, order = 1, nodes = "Jon") # this function
+# ego() is the function to extract the ego network of a given node.
+# order = 1 means we want to extract the immediate neighbors of the node. If we set order = 2, we will extract the neighbors of the neighbors, and so on.
+# nodes = "Jon" means we want to extract the ego network of the node labeled " Jon". You can also use the index of the node instead of the label, for example, nodes = 1 if Jon is the first node in the vertex sequence.
+ego_j # this will return a list of the ego network of Jon, which includes Jon and his neighbors.
+ego_j[[1]] # did you notice the differences between the outputs? 
+
+neighbors_j <- neighbors(g, v = "Jon") # this function is to extract the neighbors of a given node. 
+# v = "Jon" means we want to extract the neighbors of the node labeled "Jon". You can also use the index of the node instead of the label, for example, v = 1 if Jon is the first node in the vertex sequence.
+neighbors_j # this will return a vertex sequence of the neighbors of Jon, which does not include Jon himself.
+
+jon <- make_ego_graph(g, order = 1, nodes = "Jon") # this function is to create a subgraph of the ego network of a given node. It will return a graph object that contains only the ego and its neighbors, and the edges between them. You can visualize this subgraph to see the local structure around Jon.
+jon
+
+# visualize the ego network of Jon
+pdf(file = "GoT_jon.pdf", width = 11, height = 8.5)
+plot(jon[[1]], 
+     vertex.size = 5, 
+     vertex.color = "red", 
+     vertex.label.cex = 0.3, 
+     vertex.label.color = "black", 
+     layout = layout.fruchterman.reingold)
+dev.off()
+```
+## Degree {-}
+
+Since we have already found the neighbors of Jon, we can also calculate the degree of the node labeled "Jon". The degree of a node is the number of edges connected to it, which is equivalent to the number of neighbors it has in an undirected network. 
+
+- **Degree**: The number of edges connected to a node. 
+
+```{r degree, message=F}
+degree_j <- degree(g, v = "Jon") # this function is to calculate the degree
+# v = "Jon" means we want to calculate the degree of the node labeled "Jon". You can also use the index of the node instead of the label, for example, v = 1 if Jon is the first node in the vertex sequence.
+degree_j # this will return the degree of Jon, which is the number of edges connected to Jon. In an undirected network, this is equivalent to the number of neighbors Jon has.
+```
+
+This means that Jon has 26 connections in this network. 
+
+# Centrality {-}
+
+After defining the basic concepts of networks, we can also analyze the centrality of nodes in the network. Centrality measures are used to identify the most important or influential nodes in a network. There are various centrality measures, each capturing a different aspect of importance or influence.
+
+Some commonly used centrality measures include:
+
+- **Degree Centrality**: The number of edges connected to a node. It measures the immediate influence of a node in the network.
+- **Betweenness Centrality**: The number of shortest paths that pass through a node between other pairs of nodes. It measures the extent to which a node acts as a bridge or broker in the network.
+- **Closeness Centrality**: The average length of the shortest paths from a node to all other nodes in the network. It measures how close a node is to all other nodes in the network.
+- **Eigenvector Centrality**: A measure of the influence of a node in the network
+
+We'll explain them one by one in the following chunks.
+
+## Degree Centrality {-}
+
+First, we look at degree centrality, which is the most basic centrality measure. It simply counts the number of edges connected to a node, which indicates how many direct connections a node has in the network. A node with a high degree centrality is often considered important because it has many connections to other nodes. 
+
+Imagine in real life, a person with many friends or acquaintances might be considered popular or influential. 
+
+```{r degree centrality, message=F}
+V(g)$degree <- degree(g, normalized = T) # this function is to calculate the degree centrality of each node in the graph.
+V(g)$degree 
+summary(V(g)$degree) # this will return the summary statistics of the degree centrality of all nodes in the graph. The degree centrality is normalized by default, which means it is divided by the maximum possible degree (number of nodes - 1) to scale it between 0 and 1.
+```
+How to interpret the result? 
+
+The returned numbers here are the degree centrality of each node in this network, representing how connected each node is to other nodes in the network. Higher value indicates more connections, while lower value indicates fewer connections.
+
+Question 1: what is the degree centrality of Jon?
+
+```{r degree_jon, message=F}
+degree_j <- degree(g, v = "Jon", normalized = T) 
+degree_j 
+```
+
+Question 2: who are the top 5 nodes with the highest degree centrality in this network?
+
+```{r degree_top5, message=F}
+degree_tab <- as.data.frame(cbind(V(g)$name, V(g)$degree)) # this will return a table of the names of the nodes and their corresponding degree centrality. You can use this table to identify the top 5 nodes with the highest degree centrality.
+#degree_tab
+colnames(degree_tab) <- c("name", "degree") # this will rename the columns of the table to "name" and "degree" for better readability.
+
+degree_top5 <- degree_tab[order(degree_tab$degree, decreasing = T), ][1:5, ] # this will sort the table by the degree centrality in descending order and return the top 5 rows, which are the nodes with the highest degree centrality.
+degree_top5
+```
+## Betweenness Centrality {-}
+
+However, degree centrality does not capture the **quality** of connections or the position of the node in the overall network structure, which is why we need other centrality measures to get a more comprehensive understanding of a node's importance in the network.
+
+We introduce betweenness centrality, which measures the extent to which a node lies on the shortest paths between other nodes in the network. A node with high betweenness centrality is often considered a broker or bridge in the network, as it connects different parts of the network together.
+
+```{r betweenness, message=F}
+# to run betweenness centrality, we need to extract the largest connected component of the network first, because betweenness centrality is not well-defined for nodes that are in different disconnected components of the network. If we calculate betweenness centrality for the entire network without extracting the largest connected component, we may get misleading results, as some nodes may have a betweenness centrality of zero simply because they are in a different component of the network and cannot connect to other nodes.
+
+is_connected(g) # check whether this network is connected - we are safe to move forward
+
+V(g)$betweenness <- betweenness(g, normalized = T)
+summary(V(g)$betweenness)
+
+```
+
+Question: who are the top 5 nodes with the highest betweenness centrality in this network?
+
+```{r betweenness_top5, message=F}
+betweenness_tab <- as.data.frame(cbind(V(g)$name, round(V(g)$betweenness,3))) # this will return a table of the names of the nodes and their corresponding betweenness centrality. 
+#betweenness_tab
+colnames(betweenness_tab) <- c("name", "betweenness") 
+betweenness_top5 <- betweenness_tab[order(betweenness_tab$betweenness, decreasing = T), ][1:5, ] 
+betweenness_top5
+```
+
+This indicates that while Tyrion has the highest degree centrality, he does not have the highest betweenness centrality. This suggests that while Tyrion is well-connected, he may not be the most important broker in the network. On the other hand, Jon has a higher betweenness centrality, which indicates that he plays a crucial role in connecting different parts of the network together.
+
+## Closeness Centrality {-}
+
+We can also calculate other centrality measures such as closeness centrality and eigenvector centrality to get a more comprehensive understanding of the importance of nodes in the network.
+
+```{r closeness, message=F}
+V(g)$closeness <- closeness(g, normalized = T)
+summary(V(g)$closeness)
+
+closeness_tab <- as.data.frame(cbind(V(g)$name, round(V(g)$closeness,3)))
+colnames(closeness_tab) <- c("name", "closeness")
+closeness_top5 <- closeness_tab[order(closeness_tab$closeness, decreasing = T), ][1:5, ]
+closeness_top5
+```
+
+High closeness centrality indicates that a node is close to all other nodes in the network, which means it can quickly reach other nodes through short paths. This is different from degree centrality because degree centrality only counts the number of direct connections. However, closeness centrality tells us how efficiently a node can communicate with **all other nodes** in the network, which is not captured by degree centrality. These high-closeness nodes can be considered as influential spreaders in the network, as they can quickly disseminate information to other nodes.
+
+## Eigenvector Centrality {-}
+
+```{r eigenvector, message=F}
+V(g)$eigenvector <- eigen_centrality(g)$vector
+summary(V(g)$eigeneigenvector)
+eigenvector_tab <- as.data.frame(cbind(V(g)$name, round(V(g)$eigenvector,3)))
+colnames(eigenvector_tab) <- c("name", "eigenvector")
+eigenvector_top5 <- eigenvector_tab[order(eigenvector_tab$eigenvector, decreasing = T), ][1:5, ]
+eigenvector_top5
+```
+
+Eigenvector centrality measures the influence of a node in the network based on the idea that **connections to high-scoring nodes contribute more** to the score of the node than connections to low-scoring nodes. In other words, a node is considered important if it is connected to other important nodes. This is different from degree centrality, which only counts the number of direct connections without considering the importance of those connections. A node with high eigenvector centrality is often considered influential because it is connected to other influential nodes in the network.
+
+In a social network, for example, a person with high eigenvector centrality might be someone who knows all the well-connected people, although they themselves may not have as many direct connections as someone with high degree centrality. This person is a hidden key player in the social network (Cersei in this case!)
+
+# Summary {-}
+
+A network can also be directed or undirected, weighted or unweighted, and can have various types of nodes and edges. The choice of network type depends on the research question and the nature of the data being analyzed. In a directed network, we can distinguish between in-degree (number of incoming edges) and out-degree (number of outgoing edges). In a weighted network, edges have weights that represent the strength or intensity of the connection between nodes. For example, in a social network, the weight of an edge could represent the frequency of interactions between two individuals.
+
+Network analysis is a powerful tool for understanding complex systems and relationships in various fields, including sociology, biology, computer science, and more. By analyzing the structure and properties of networks, we can gain insights into the behavior of individuals and groups, the spread of information or diseases, and the dynamics of social interactions. It is far beyond a method, but a relational perspective to understand the world around us.
+
+For more to learn about network analysis, you can check out the following resources:
+
+- [Katya Ognyanova's Network Analysis in R with igraph](https://kateto.net/tutorials/)
+
+- Newman, M. (2018). Networks (2 edition). New York, NY: Oxford University Press. (ebook available via UT library)
+
+- Estrada, E., & Knight, P. A. (2015). A first course in network theory. Oxford University Press. (ebook available via UT library)
+
+- Menczer, F., Fortunato, S., & Davis, C. (2020). A First Course in Network Science. New York, NY: Cambridge University Press. [GitHub tutorials](https://cambridgeuniversitypress.github.io/FirstCourseNetworkScience/)
+
+- Gonzalez-Bailon, S. (2017). Decoding the Social World: Data Science and the Unintended Consequences of Communication. The MIT Press. (ebook available via UT library)
