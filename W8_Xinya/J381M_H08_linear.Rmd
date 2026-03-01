@@ -1,0 +1,320 @@
+---
+title: "J381M_H08_Linear Regression"
+author: "Xinya Jiang"
+date: "2026-03-05"
+output: 
+  html_document:
+    code_folding: show
+    highlight: haddock
+    number_sections: yes
+    theme: lumen
+    toc: yes
+    toc_depth: 4
+    toc_float: yes
+urlcolor: blue
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+```{r setup, include=FALSE}
+# this is the chunk for setting up the environment. It will not be included in the final output (include=FALSE). Run it before you run the following chunks.
+knitr::opts_chunk$set(echo = TRUE, fig.width=8, fig.height=4)
+options(scipen = 0, digits = 3)  # controls base R output
+```
+
+\pagebreak
+
+# Objectives {-}
+
+Welcome back to J381M! Today we will review some basic knowledge of linear regression and logistic regression. We will also try to conduct these two kinds of regressions in R! 
+
+Contents for today:
+
+0. Basic knowledge of linear regression:  
+    + Simple linear regression
+    + Multiple linear regression
+    
+1. Conduct linear regression in R:
+    + the lm function
+    + How to interpret the results
+
+2. Logistic regression:
+    + Basic knowledge
+    + Conduct logistic regression in R
+    + How to interpret the results
+
+Now let's start!
+
+# Relationship between two variables {-}
+
+In social science research, we are usually curious about the relationship between two variables. 
+
+For example:
+
+* The toxicity score of one tweet & user engagement metrics (retweet, like, and comment)
+* Political attitudes/engagement & media exposure
+* Risk perception & health protective behaviors
+
+We can use the values of one variable X to predict the values of another Y. 
+We call this explaining Y using X. 
+While there are many ways to do this, one is to fit a line or shape that describes the relationship.
+
+Therefore, the first step will be:
+
+* Determine whether or not there is a relationship between the variables of interest
+* Determine whether there is a linear or nonlinear relationship
+
+![](fig/1.png)
+
+Linear regression attempts to model the relationship between two variables by fitting a linear equation to observed data. 
+One variable is considered to be an explanatory variable, and the other is considered to be a dependent variable.
+
+**Linear regression does not require X to be continuous.**
+**The key requirement is that Y is continuous/numeric.**
+If your Y is categorical, you should use logistic regression instead of linear regression.
+We will talk about that later.
+
+# Simple Linear Regression {-}
+
+In algebra, a straight line is written as:
+
+$$
+Y = a + bX
+$$
+
+a = intercept (value of Y when X = 0)  
+b = slope (how much Y changes when X increases by 1)
+
+In statistics, outcomes are not perfectly predictable.
+
+We therefore write a linear equation: 
+
+$$
+Y=\beta_0+\beta_1X+\epsilon
+$$
+
+$\beta_0$ = intercept (population parameter)
+
+$\beta_1$ = effect of X on Y
+
+$\epsilon$ = error term (unobserved influences)
+
+The most common method for fitting a regression line is the method of **ordinary least-squares (OLS)**. 
+This method calculates the best-fitting line for the observed data by minimizing the sum of the squares of the vertical deviations from each data point to the line.
+
+![](fig/2.png)
+
+Once we have this best-fitting line, we can ask a simple question:
+How well does the line actually explain the data?
+
+The **$R^2$ statistic** answers this question. 
+It tells us how much of the variation in the outcome variable can be accounted for by the regression line, compared to making no prediction at all.
+
+In simple terms:
+**$R^2$ measures how much better the regression line predicts $Y$ than just using the average value of $Y$.**
+
+- If the points lie very close to the line, the model explains a lot → $R^2$ is high.  
+- If the points are widely scattered around the line, the model explains little → $R^2$ is low.
+
+An $R^2$ of 0 means the line does no better than guessing the average, while an $R^2$ close to 1 means the line captures most of the pattern in the data.
+
+![](fig/3.png)
+
+# Multiple Linear Regression {-}
+
+What if you want to explore the relationship between multiple X and Y?
+
+For example, the multimodal characteristics of TikTok videos and user engagement metrics.
+
+We can use multiple linear regression.
+Predict the response variable using more than one predictor variable.
+
+$$
+Y = \beta_0 + \beta_1 X_1 + \beta_2 X_2 + \cdots + \beta_p X_p + \epsilon
+$$
+
+# Conduct Linear Regression in R {-}
+
+OLS is implemented in R by the **lm** function
+
+Now let's try to conduct linear regression using the lm function in R!
+
+```{r}
+install.packages("car", repos = "https://cloud.r-project.org") ##if this is a new package we need to install first. 
+library(car) #We have to library the package every time we use.
+library(ggplot2) # for some amazing looking graphs
+library(cowplot) # arranging plots into a grid
+```
+
+# Observe the data
+
+```{r}
+# Inspect and summarize the data.
+head(Prestige) # First 6 rows of dataset
+```
+
+# Visualizing the data: scatterplot
+
+```{r}
+plot_income <- ggplot(data = Prestige, aes(x = prestige, y = income, col = type)) + geom_point()
+plot_education <- ggplot(data = Prestige, aes(x = prestige, y = education, col = type)) + geom_point()
+plot_women <- ggplot(data = Prestige, aes(x = prestige, y = women, col = type)) + geom_point()
+plot_census <- ggplot(data = Prestige, aes(x = prestige, y = census, col = type)) + geom_point()
+plot_grid(plot_income, plot_education, plot_women, plot_census, labels = "AUTO")
+```
+
+# Simple linear regression
+
+```{r}
+reg1 <- lm(prestige ~ education, data = Prestige)
+summary(reg1)
+```
+
+Let's interpret the model result!
+
+## Residual
+Residuals are the differences between the observed values and the values predicted by the regression model.
+
+$$
+\text{Residual} = Y_{\text{observed}} - Y_{\text{predicted}}
+$$
+
+In simple terms:
+
+A residual tells us how far each data point is from the regression line.
+
+Positive residual → the model underestimated the outcome
+
+Negative residual → the model overestimated the outcome
+
+The summary (Min, 1Q, Median, 3Q, Max) shows how these prediction errors are distributed.
+
+## Estimate
+The estimate is the regression coefficient (β).
+
+It tells us how much Y changes, on average, when the predictor increases by one unit.
+
+Example: education = 5.361
+Meaning: A one-unit increase in education is associated with an average increase of 5.361 units in the outcome variable.
+
+## Standard Error (Std. Error)
+
+The standard error measures how uncertain the estimate is.
+
+It tells us how much the coefficient would vary if we repeated the study with different samples.
+
+Small standard error → more precise estimate
+
+Large standard error → less precise estimate
+
+## t value
+
+The t value compares the estimate to its uncertainty:
+
+$$
+t = \frac{\text{Estimate}}{\text{Standard Error}}
+$$
+
+It indicates how far the estimate is from zero in standard-error units.
+
+A larger absolute t value means stronger evidence that the effect is not zero.
+
+## p value
+
+The p value tells us how likely it is to observe an effect this large if the true effect were actually zero.
+
+A small p value suggests the relationship is statistically significant.
+
+## R-squared
+
+R² measures how well the regression model explains the data.
+
+It represents the proportion of variation in the outcome variable that is explained by the predictors.
+
+Example: R² = 0.7228
+
+Meaning: About 72% of the variation in the outcome variable can be explained by education in this model.
+
+# Multiple linear regression
+
+```{r}
+reg2 <- lm(prestige ~ education + log(income) + women + census, data = Prestige)
+summary(reg2) 
+```
+
+# Logistic Regression {-}
+
+Sometimes the dependent variable is binary (0 or 1).
+
+For example:
+The impact of age on whether or not a patient has a certain disease (outcome: ill or healthy).
+
+
+![](fig/4.png)
+
+In this case, we shouldn't use linear regression.
+
+
+![](fig/5.png)
+
+Here is how the points are fitted using a binary logistic regression.
+
+![](fig/6.png)
+
+The logit function can relate the probability of occurrence of an event (bounded between 0 and 1) to the linear combination of independent variables.
+
+It can also ensure that no matter in which range the X values are located, Y will only take numbers between 0 and 1.
+
+Logistic regression is part of a broader type of model called generalized linear models (GLM).
+
+* Binary logistic regression is used when the goal is to estimate the relationship between a binary dependent variable (= two outcomes), and one or more independent variables (of any type).
+
+* Multinomial logistic regression is used when the goal is to estimate the relationship between a nominal dependent variable with three or more unordered outcomes, and one or more independent variables (of any type).
+
+* Ordinal logistic regression is used when the goal is to estimate the relationship between an ordinal dependent variable with three or more ordered outcomes, and one or more independent variables (of any type).
+
+# Conduct Logistic Regression in R {-}
+
+Example: A researcher is interested in how variables, such as GRE (Graduate Record Exam scores), GPA (grade point average) and prestige of the undergraduate institution, effect admission into graduate school. The response variable, admit/don’t admit, is a binary variable.
+
+```{r}
+data <- read.csv("https://stats.idre.ucla.edu/stat/data/binary.csv")
+## view the first few rows of the data
+head(data)
+```
+
+The code below estimates a logistic regression model using the glm (generalized linear model) function. 
+
+First, we convert rank to a factor to indicate that rank should be treated as a categorical variable.
+
+```{r}
+data$rank <- factor(data$rank)
+```
+
+```{r}
+logit <- glm(admit ~ gre + gpa + rank, data = data, family = "binomial")
+summary(logit)
+```
+
+## z value
+
+The z value plays the same role in logistic regression as the t value in linear regression.
+
+## Deviance
+
+* The null deviance measures how well the model performs when no predictors are included.
+
+* The residual deviance measures how well the model performs after including the predictors.
+
+## AIC (Akaike Information Criterion)
+
+The AIC is a measure used to compare different models.
+
+It balances two things:
+
+* How well the model fits the data
+
+* How complex the model is
+
+Lower AIC → better model (when comparing models fit to the same data)
