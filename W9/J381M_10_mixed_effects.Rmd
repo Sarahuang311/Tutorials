@@ -1,0 +1,280 @@
+---
+title: "J381M_10_MEM"
+author: "Shengchun Huang"
+date: "2026-03-12"
+output: 
+  html_document:
+    code_folding: show
+    highlight: haddock
+    number_sections: yes
+    theme: lumen
+    toc: yes
+    toc_depth: 4
+    toc_float: yes
+urlcolor: blue
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+# this is the chunk for setting up the environment. It will not be included in the final output (include=FALSE). Run it before you run the following chunks.
+knitr::opts_chunk$set(echo = TRUE, fig.width=8, fig.height=4)
+options(scipen = 0, digits = 3)  # controls base R output
+```
+
+\pagebreak
+
+# Objectives {-}
+
+Welcome back to J381M! Last week, we have learned OLS and logistic regression. Those models work well when observations are independent from one another. But in many computational media settings, data are clustered or nested. For example, users are nested within communities, and communities are nested within platforms. In such cases, we need to use mixed effects models (also known as multilevel models or hierarchical linear models) to account for the non-independence of observations.
+
+Content of today:
+
+0. OLS and the independence assumption
+   - Review what OLS assumes
+   - Discuss how dependence can arise in real data
+   - Identify situations in which OLS is no longer sufficient
+
+1. Introduction to mixed-effect modeling
+   - Why mixed-effect models are useful
+   - Fixed effects versus random effects
+   - Random intercepts with real-life examples
+   - Random slopes as an extension
+
+2. Interpreting mixed-effect model output
+   - Read and interpret model coefficients
+   - Understand why we may want robust SEs
+   - Use `emmeans` to generate predicted values and comparisons
+   - Explain why confidence intervals are important
+
+3. Visualizing mixed-effect model results
+   - Turn model output into interpretable figures
+   - Plot predicted values with confidence intervals
+   - Create figures that can be reported in research papers
+    
+Let's get started!
+
+# Recap {-}
+
+Before we learn the new content today, let's recap what we have learned. 
+
+$$
+Y=\beta_0+\beta_1X+\epsilon
+$$
+This is the OLS regression model. It assumes normal distribution of the error term $\epsilon$ and that the relationship between $Y$ and $X$ is linear, i.e., the change in Y is proportional to the change in X. In other words, the model assumes that the effect of $X$ on $Y$ is constant across all levels of $X$.
+
+(Normal distribution means that the error term $\epsilon$ is independent and identically distributed (i.i.d.) with mean zero and constant variance $\sigma^2$. This means that the observations are independent of each other, and the variance of the errors is the same across all levels of the independent variable $X$.)
+
+However, in many real-world scenarios, this assumption is violated. For example, if we are studying the effect of a new teaching method on student performance, students are nested within grade. In this case, the performance of students within the same grade may be more similar to each other than to students in different grades, leading to dependence among observations. In this case, $\epsilon$ may not be independent, and the variance of the errors may not be constant across all levels of $X$. This can lead to biased estimates of the coefficients and standard errors, making it difficult to draw valid conclusions from the model.
+
+
+# Introduction to mixed-effect modeling {-}
+
+Mixed-effect models, also known as multilevel models or hierarchical linear models, are designed to handle data that are clustered or nested. They allow us to account for the non-independence of observations by including random effects in the model.
+
+More specifically, mixed-effect models include two kinds of components:
+
+- **Fixed effects**, which represent the average relationship between predictors and the outcome across all observations;
+- **Random effects**, which allow part of the model to vary across clusters, such as classrooms, communities, platforms, or individuals.
+
+## Random intercept {-}
+
+A simple mixed-effect model with a **random intercept** can be written as:
+
+$$
+Y_{ij} = \beta_0 + \beta_1X_{ij} + u_j + \epsilon_{ij}
+$$
+
+where:
+
+- $Y_{ij}$ is the dependent variable for observation $i$ in cluster $j$.
+- $\beta_0$ is the fixed intercept, representing the average outcome when $X$ is zero.
+- $\beta_1$ is the fixed slope, representing the average effect of $X$ on $Y$ across all clusters.
+- $u_j$ is the random intercept for cluster $j$, capturing the deviation of cluster $j$ from the overall intercept $\beta_0$.
+- $\epsilon_{ij}$ is the residual error term for observation $i$.
+
+In this model, clusters are allowed to have different baseline levels of the outcome, but the effect of \(X\) is assumed to be the same across clusters. This is why it is called a **random-intercept model**.
+
+## Random slope {-}
+
+In some situations, however, we may also expect the effect of \(X\) to differ across clusters. For example, if we study how study time predicts exam scores across classrooms, the strength of that relationship may not be identical in every classroom. In that case, we can extend the model by adding a **random slope**, so that both the intercept and the slope are allowed to vary across clusters.
+
+A mixed-effect model with both a random intercept and a random slope can be written as:
+
+$$
+Y_{ij} = \beta_0 + \beta_1 X_{ij} + u_{0j} + u_{1j} X_{ij} + \epsilon_{ij}
+$$
+
+Here, \(u_{0j}\) allows cluster \(j\) to have its own intercept, and \(u_{1j}\) allows cluster \(j\) to have its own slope. In other words, clusters may differ not only in their baseline outcome levels, but also in how strongly \(X\) is associated with \(Y\).
+
+# Interpreting mixed-effect model output {-}
+
+Now, let's get some data to practice this modeling.
+
+```{r load-data, echo=T, message=F, warning=F}
+library(lme4)
+library(lmerTest)
+library(ggplot2)
+library(dplyr) # we install these packages for data wrangling and visualization
+
+# load the data
+data("sleepstudy") # this dataset is included in the lme4 package. It contains reaction times of subjects under different sleep deprivation conditions. Each subject was tested on multiple days, and the data are nested within subjects.
+head(sleepstudy) # let's take a look at it!
+```
+
+We can look at the data in a visual way to understand the structure of the data and the relationships between variables.
+
+```{r data-visualization, echo=T, message=F, warning=F}
+ggplot(sleepstudy, aes(x = Days, y = Reaction, group = Subject)) +
+  geom_line(alpha = .5) +
+  geom_point() +
+  theme_minimal()
+```
+
+From the plot, we can see a general tendency for reaction time to increase as days of sleep deprivation increase. We can also see that subjects differ in their baseline reaction times, which suggests that a random intercept may be appropriate. 
+
+In addition, the trajectories do not appear perfectly parallel, so it is possible that subjects also differ in how strongly reaction time changes over days. This motivates us to begin with a random-intercept model and then consider whether adding a random slope improves the model.
+
+Now take a look at the trends when we split the data by subject:
+
+```{r data-visualization-by-subject, echo=T, message=F, warning=F}
+ggplot(sleepstudy, aes(x = Days, y = Reaction)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~Subject) +
+  theme_minimal()
+```
+
+It shows that while the overall trend is positive, the strength of the relationship between Days and Reaction varies across subjects. Some subjects show a strong positive relationship, while others show a weaker relationship or even a flat relationship. This suggests that there may be random slopes in addition to random intercepts in the data.
+
+# Fitting an OLS model first {-}
+
+Before we fit a mixed-effect model, let's first fit a simple OLS model to the data:
+```{r ols-model, echo=T, message=F, warning=F}
+ols_model <- lm(Reaction ~ Days, data = sleepstudy)
+summary(ols_model)
+```
+While we see a significant positive relationship between Days and Reaction, this model does not account for the fact that observations are nested within subjects. Because repeated observations from the same subject are not fully independent, the standard errors may be underestimated. As a result, the model may overstate the precision of the estimates and increase the risk of Type I error.
+
+(What is a Type I error? It is the error of rejecting a true null hypothesis. In other words, it is the error of finding a significant effect when there is actually no effect. [We see an effect, but this is a wrong estimate.] When we have clustered data and we do not account for the clustering, we may find significant effects that are actually due to the clustering rather than the predictors of interest.
+
+For your information, a Type II error occurs when we fail to reject a false null hypothesis. In other words, we do not detect an effect that is actually present. [We don't see an effect, but there is actually is!] Type II error is usually associated with low statistical power, high variability, or small sample size. In today’s context, the more immediate concern is Type I error, because ignoring clustering often makes our estimates look more precise than they really are.)
+
+# Fitting a random-intercept model {-}
+
+Now let's fit a mixed-effect model with a random intercept for subject:
+
+```{r random-intercept-model, echo=T, message=F, warning=F}
+ri_model <- lmer(Reaction ~ Days + (1 | Subject), data = sleepstudy)
+summary(ri_model)
+```
+
+`Reaction ~ Days` means that we are modeling Reaction as a function of Days. (Y ~ X)
+
+`(1 | Subject)` means that we allow the intercept to vary across subjects. In other words, each subject can have their own baseline reaction time, while the slope of Days is assumed to be the same for everyone.
+
+
+# Interpreting the output {-}
+
+There are two parts of the output that are especially important:
+
+- **Fixed effects**: These tell us the average relationship in the sample. The coefficient for Days tells us how much Reaction is expected to change, on average, for a one-unit increase in Days. This is similar to the coefficient we get from the OLS model, but it is more accurate because it accounts for the clustering of observations within subjects.
+
+- **Random effects**: These tell us how much subjects vary from one another. The random intercept variance tells us whether subjects differ in their baseline reaction times. The random slope variance (if we had included it) would tell us whether subjects differ in how strongly their reaction times change over days.
+
+Compare the fixed effect of Days from the OLS model and the random-intercept model. They may look similar, but the mixed-effect model is more appropriate because it accounts for the fact that repeated observations are nested within subjects.
+
+## Robust SEs {-}
+Even after fitting a mixed-effect model, researchers often want inference that is more robust to model misspecification. One common concern is that the model may not perfectly capture the error structure of the data. In that case, robust standard errors can help provide more cautious uncertainty estimates.
+
+Today, we will use the `clubSandwich` package to obtain cluster-robust standard errors. Here, the clusters are subjects.
+```{r robust-ses, echo=T, message=F, warning=F}
+library(clubSandwich) # install the package first if you haven't.
+# Get cluster-robust standard errors
+robust_se <- coef_test(ri_model, cluster = sleepstudy$Subject, vcov = "CR2")
+robust_se
+```
+
+What does this output show?
+
+It gives us coefficient estimates, standard errors, test statistics, and p-values.
+
+These standard errors are adjusted for clustering at the subject level.
+
+In practice, this helps us avoid being overly confident in our estimates.
+
+You do not need to memorize the details of `CR2` today. The important takeaway is that robust standard errors are often used when we want more reliable inference for clustered data.
+
+(The `coef_test` function from the `clubSandwich` package provides cluster-robust standard errors for the fixed effects in our mixed-effect model. By specifying `cluster = sleepstudy$Subject`, we are telling the function to account for the clustering of observations within subjects. The `vcov = "CR2"` argument specifies that we want to use the CR2 variance-covariance estimator, which is a common choice for cluster-robust standard errors.)
+
+## emmeans {-}
+
+Model coefficients are useful, but they are not always easy to interpret directly. This is especially true once models become more complex. The `emmeans` package helps us translate model output into estimated marginal means or predicted values.
+
+In today's example, Days is numeric, so instead of group means, we will use emmeans to generate predicted values across different days.
+
+```{r emmeans, echo=T, message=F, warning=F}
+library(emmeans)
+emm_days <- emmeans(ri_model, ~ Days, at = list(Days = seq(0:9)))
+emm_days # let's see what it gives us
+
+# in the previous step, we discussed why we need robust SEs. However, the `emmeans` function does not work with robust SEs. 
+# let's create the robust variance-covariance matrix first, and then use it in the emmeans function.
+
+# cluster-robust variance-covariance matrix
+library(clubSandwich)
+V_CR2 <- vcovCR(ri_model, cluster = sleepstudy$Subject, type = "CR2")
+
+emm_days_robust <- emmeans(ri_model, ~ Days, at = list(Days = seq(0:9)), vcov. = V_CR2)
+emm_days_robust
+```
+This output gives us the model-predicted reaction time at each day, along with standard errors and confidence intervals. This is particularly helpful in research papers because it allows us to report predicted values at meaningful levels of the predictor, rather than just the average effect, which is seen as a more robust way to communicate results.
+
+# Visualizing mixed-effect model results {-}
+
+Finally, let's visualize the predicted values from our mixed-effect model. This can help us communicate our findings more effectively.
+
+```{r visualization, echo=T, message=F, warning=F}
+# Convert emmeans output to a data frame for plotting
+emm_df <- as.data.frame(emm_days_robust)
+# Plot predicted values with confidence intervals
+ggplot(emm_df, aes(x = Days, y = emmean)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = lower.CL, ymax = upper.CL), alpha = 0.2) +
+  labs(x = "Days of Sleep Deprivation", y = "Predicted Reaction Time") +
+  theme_minimal()
+
+
+# If the x here is a categorical variable, we can use error bars instead of ribbons to show confidence intervals. For example, if we had a categorical predictor like "Treatment Group", we could do something like the codes below. The current data set does not look properly for this kind of plot, so I will not run the code, but you can try it with your own data that has categorical predictors.
+
+# ggplot(emm_df, aes(x = Days, y = emmean)) +
+#   geom_line() +
+#   geom_point(size = 2) +
+#   geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = .15) +
+#   labs(
+#     x = "Days of sleep deprivation",
+#     y = "Predicted reaction time",
+#     title = "Predicted reaction time across days",
+#     subtitle = "Points are model predictions; error bars are 95% confidence intervals"
+#   ) +
+#   theme_minimal()
+```
+                
+# When do we use mixed-effect models? {-}
+
+Mixed-effect models are useful when observations are not fully independent. Common examples include:
+
+- repeated observations from the same person over time (digital trace data)
+- posts nested within users (network data)
+- comments nested within threads (how one comments is dependent on the other)
+- articles nested within news outlets
+- students nested within classrooms
+- users nested within platforms
+
+A good rule of thumb is: if the same group or unit appears multiple times in your data, you should at least consider a mixed-effect model.
+
+More learning resources for regression and mixed-effect models:
+
+- [Applied Regression Analysis and Generalized Linear Models](https://www.john-fox.ca/AppliedRegression/chap-25.pdf) by John Fox
+
+
