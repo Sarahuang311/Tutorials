@@ -1,6 +1,5 @@
 ---
 title: "J381M_H01_R_basics"
-date: "2026-01-13"
 author: "Shengchun Huang"
 output: 
   html_document:
@@ -26,7 +25,7 @@ options(scipen = 0, digits = 3)  # controls base R output
 
 # Objectives {-}
 
-This tutorial is designed to get you up and running with R as quickly as possible. If you have any questions, come to office hours (TH 9:30-10:30am, DMC 3.370), or ask questions on Slack in our class channel #j381m.
+This tutorial is designed to get you up and running with R as quickly as possible. If you have any questions, come to office hours (DMC 3.370), or ask questions on Slack in our class channel #j381m.
 
 Contents for today:
 
@@ -167,16 +166,34 @@ rounded_value
 ```
 
 Or you can do this
-```{r round_function_no_arg_name}
+```{r round_function_chunk2}
 rounded_value2 <- round(3.14159, 3) # round to 3
 rounded_value2
 ```
 
+An alternative way to do so:
+
+```{r round_function_chunk3}
+rounded_value3 <- sprintf("%.3f", 3.14159) # round to 3
+rounded_value3
+
+# %: Signals the start of a format specifier.
+# .2: Specifies the number of digits after the decimal point.
+# f: Specifies standard decimal/floating-point format.
+
+rounded_value4 <- sprintf("%.2f", 3.10000) # round to 2
+rounded_value4
+
+# what will it show you if you use round for 3.1000?
+
+```
+
+
 A slightly more challenging task: define your own function.
 ```{r define_function}
-multiply_by_two <- function(x) { # define a function named multiply_by_two that takes one argument `x`
-  result <- x * 2 # multiply the input `x` by 2 and store the result in a variable named result
-  return(result) # return the result
+multiply_by_two <- function(x) {     # define a function named multiply_by_two that takes one argument `x`
+  result <- x * 2                    # multiply the input `x` by 2 and store the result in a variable named result
+  return(result)                     # return the result
 }
 multiply_by_two(5)
 ```
@@ -298,6 +315,8 @@ Finally, once you are done with analysis, you should save the objects that need 
 
 ```{r save_rds}
 saveRDS(tips_data, file = "tips_data.rds") # save the dataset to a file named "tips_data.rds"
+
+write.csv(tips_data, file = "tips_data.csv", row.names = FALSE) # save the dataset to a CSV file named "tips_data.csv")
 ```
 
 Do not forget to save your R script file as well! You can click on "File" -> "Save" or use the keyboard shortcut: On Mac: Command + S; On Windows: Ctrl + S.
