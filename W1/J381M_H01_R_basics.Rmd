@@ -167,7 +167,7 @@ rounded_value
 
 Or you can do this
 ```{r round_function_chunk2}
-rounded_value2 <- round(3.14159, 3) # round to 3
+rounded_value2 <- round(3.100000000, digits = 2) # round to 3
 rounded_value2
 ```
 
@@ -191,11 +191,22 @@ rounded_value4
 
 A slightly more challenging task: define your own function.
 ```{r define_function}
-multiply_by_two <- function(x) {     # define a function named multiply_by_two that takes one argument `x`
-  result <- x * 2                    # multiply the input `x` by 2 and store the result in a variable named result
-  return(result)                     # return the result
+
+x <- 5
+results <- x * 2
+results
+
+multiply_by_two <- function(x) {
+  results <- x * 2 + x*100
+  return(results)
 }
+
 multiply_by_two(5)
+
+my_numbers <- c(1, 1, 2, 3, 4, 5)
+
+multiply_by_two(my_numbers)
+
 ```
 Using this function, can you define a new function named `add_five` that takes one argument and adds 5 to it? Show me your code.
 
@@ -207,6 +218,7 @@ We often use the `read.csv()` function to read CSV files. The basic syntax is as
 
 ```{r read_data}
 tips_data <- read.csv("tips.txt", stringsAsFactors = T) # while this is a .txt file, it is actually in csv format (comma separated values)
+tips_data_1 <- read.csv("/Users/sh59273/Library/CloudStorage/Box-Box/Box Backup/UT/Teaching/J381M_Spring26/Tutorials/W1/tips.txt", stringsAsFactors = T) 
 ```
 Here, `tips_data` is the name of the variable that will store the imported data, and `"data/tips.txt"` is the file path to the CSV file. The argument `stringsAsFactors = T` tells R to treat string variables as factors (categorical variables). - we will talk more about data types next week.
 
