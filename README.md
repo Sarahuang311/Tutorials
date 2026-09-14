@@ -1,4 +1,4 @@
-# J381M Tutorials & Handouts
+# J381M Tutorials
 
 Welcome to the tutorial repository for **J381M**. This repository contains all the weekly handouts, code snippets, and exercise files needed for the course.
 
