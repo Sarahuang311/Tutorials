@@ -1,7 +1,6 @@
 ---
 title: "J381M_H04_nlp"
 author: "Shengchun Huang"
-date: "2026-02-05"
 output: 
   html_document:
     code_folding: show
