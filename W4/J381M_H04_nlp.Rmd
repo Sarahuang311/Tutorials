@@ -152,6 +152,16 @@ head(cleaned_data$word) # you can see numbers are also removed if any existed
 nrow(cleaned_data) # also reflected in the row change
 ```
 
+## Extended Learning: Regular Expressions {-}
+
+To learn NLP deeper, you will need to understand regular expressions, which are patterns used to match character combinations in strings. Regular expressions are powerful tools for text processing, allowing you to search, match, and manipulate text data efficiently.
+
+ [Regular Expression Basics, YouTube video](https://www.youtube.com/watch?v=Jr_2GlvrTCA). 
+
+[Textbook chapter on strings in R for Data Science](https://r4ds.had.co.nz/strings.html).
+
+[R package documentation for stringr](https://stringr.tidyverse.org/articles/regular-expressions.html) and [cheatsheet](https://opensource.posit.co/software/stringr/).
+
 # Text Analysis {-}
 
 Now that we have processed the text data, we can move on to analyzing it. We will cover three common text analysis techniques: descriptive analysis, sentiment analysis, and topic modeling.
