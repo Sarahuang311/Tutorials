@@ -1,7 +1,6 @@
 ---
 title: "J381M_H06_network"
 author: "Shengchun Huang"
-date: "2026-02-19"
 output: 
   html_document:
     code_folding: show

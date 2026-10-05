@@ -1,0 +1,735 @@
+---
+title: "J381M_H05_sml"
+author: "Shengchun Huang"
+output: 
+  html_document:
+    code_folding: show
+    highlight: haddock
+    number_sections: yes
+    theme: lumen
+    toc: yes
+    toc_depth: 4
+    toc_float: yes
+urlcolor: blue
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+# this is the chunk for setting up the environment. It will not be included in the final output (include=FALSE). Run it before you run the following chunks.
+knitr::opts_chunk$set(echo = TRUE, fig.width=8, fig.height=4)
+options(scipen = 0, digits = 3)  # controls base R output
+```
+
+\pagebreak
+
+# Objectives {-}
+
+Welcome back to J381M!
+
+Last week, we worked with unsupervised text analysis: we processed text, counted words, used sentiment dictionaries, and explored topic models. Those methods help us describe patterns in text without giving the computer a known outcome to predict.
+
+This week, we move to **supervised machine learning (SML)**. In supervised learning, we begin with examples that already have labels and ask a model to learn the relationship between the text and those labels. We can then use the trained model to classify new, unseen documents.
+
+Our running example uses Amazon customer reviews. The review text is our input, and the star rating gives us a convenient pre-existing label. We will turn the review text into numerical features using TF-IDF and train a logistic regression model to predict whether a review is **positive** or **negative**.
+
+Content of today:
+
+0. Set-up:
+    + Load packages and the Amazon review dataset.
+    + Review the structure of the data.
+
+1. Supervised learning basics:
+    + Classification vs. regression.
+    + Where labels come from: pre-labeling and codebooks.
+    + Training, validation, and test sets.
+
+2. Text as features:
+    + Review tokenization and stop-word removal from Week 4.
+    + Convert text to TF-IDF features.
+
+3. Build a text classifier:
+    + Split the data.
+    + Define a preprocessing recipe.
+    + Fit a logistic regression classifier.
+    + Make predictions on unseen reviews.
+
+4. Evaluate and interpret the model:
+    + Confusion matrix and accuracy.
+    + Precision, recall, and F1-score.
+    + Compare model performance with a simple baseline.
+    + Inspect influential words and misclassified reviews.
+
+# Set up the environment {-}
+
+For this tutorial, make sure `Amazon_Reviews.csv` is saved in the same project folder as this R Markdown file.
+
+If you have not installed the packages before, run the following once in the Console:
+
+```{r install-packages, eval=FALSE}
+install.packages(c(
+  "tidyverse",
+  "tidytext",
+  "tidymodels",
+  "textrecipes",
+  "stopwords"
+))
+```
+
+Now load the packages we will use today.
+
+```{r library, message=FALSE, warning=FALSE}
+library(tidyverse)    # data manipulation and visualization
+library(tidytext)     # tidy text tools
+library(tidymodels)   # modeling workflow
+library(textrecipes)  # text preprocessing steps for tidymodels
+```
+
+Read the Amazon review data and take a quick look at its structure.
+
+```{r read-data}
+amazon_reviews_raw <- read_csv(
+  "Amazon_Reviews.csv",
+  col_types = cols(
+    `Reviewer Name` = col_character(),
+    Country = col_character(),
+    Rating = col_character(),
+    `Review Title` = col_character(),
+    `Review Text` = col_character(),
+    .default = col_character()
+  )
+)
+
+nrow(amazon_reviews_raw)
+head(amazon_reviews_raw)
+glimpse(amazon_reviews_raw)
+```
+
+The dataset contains customer reviews of Amazon.com. The two columns we care about most today are:
+
+- `Review Text`: the text we want the model to learn from.
+- `Rating`: the existing 1-to-5-star rating that we will use to construct our outcome label.
+
+# Supervised Machine Learning Basics {-}
+
+## What is supervised learning? {-}
+
+In **supervised learning**, the model learns from examples for which the correct outcome is already known.
+
+For today's example:
+
+- **Input (X):** the words in a customer review.
+- **Outcome (Y):** whether that review is labeled positive or negative.
+- **Goal:** learn patterns from labeled reviews and use them to predict the label of a new review.
+
+This is different from the topic modeling we used in Week 4. Topic modeling is **unsupervised** because we did not give the model a correct topic label for each document in advance. Here, we do provide an outcome label.
+
+## Classification vs. regression {-}
+
+There are two common supervised learning tasks:
+
+**Classification** predicts a category.
+
+- positive vs. negative review
+- spam vs. not spam
+- political vs. non-political article
+- one news topic vs. another
+
+**Regression** predicts a number.
+
+- a 1-to-5 star rating
+- the number of shares an article receives
+- a continuous survey score
+
+Today our main task is **binary classification**: predicting positive vs. negative reviews. At the end of the handout, there is an optional regression extension.
+
+## Where do labels come from? Pre-labeling and codebooks {-}
+
+A supervised model cannot learn without labeled examples. Sometimes labels already exist in the data. Other times, researchers must create them by manually coding a sample of documents before training a model.
+
+In our Amazon data, star ratings give us a convenient way to create labels. We will use the following **codebook**:
+
+| Star rating | Sentiment label | Use in today's classifier |
+|:---:|:---:|:---:|
+| 1-2 stars | negative | Yes |
+| 3 stars | neutral | No |
+| 4-5 stars | positive | Yes |
+
+This is an **operationalization choice**. The model does not discover what "positive" means on its own; we define the label first. In a research project, a codebook should clearly define the categories so that human coders—or a later model—know what counts as each label.
+
+If humans create the labels, researchers should also think about coder training, ambiguity, intercoder reliability, and how disagreements are resolved. We will not go into those procedures today, but label quality strongly constrains model quality.
+
+## Training, validation, and test sets {-}
+
+A major rule in machine learning is: **do not evaluate a model on the same data used to train it.**
+
+We usually separate labeled data into three roles:
+
+```
+All labeled data
+│
+├── Training set      → model learns patterns here
+├── Validation set    → compare or adjust modeling choices here
+└── Test set          → final evaluation on untouched data
+```
+
+Why do we need this separation?
+
+- The **training set** is used to estimate the model.
+- The **validation set** can be used while we are deciding among preprocessing choices, models, or tuning parameters.
+- The **test set** should stay untouched until the workflow is finalized. It gives us the best estimate of how the model performs on genuinely unseen data.
+
+For today's tutorial, we will create an approximately **60% training / 20% validation / 20% test** split. After checking our workflow on the validation data, we will refit the finalized workflow using the combined training + validation data and evaluate it once on the test set.
+
+# Prepare the Data {-}
+
+## Clean the ratings and text {-}
+
+The rating is stored as text such as `"Rated 1 out of 5 stars"`. We first extract the numeric rating and remove rows without usable review text or ratings.
+
+```{r clean-data}
+amazon_reviews_clean <- amazon_reviews_raw %>%
+  rename(
+    rating_text = Rating,
+    review_text = `Review Text`
+  ) %>%
+  mutate(
+    rating = as.numeric(str_extract(rating_text, "\\d+")),
+    word_count = str_count(review_text, "\\w+")
+  ) %>%
+  filter(
+    !is.na(review_text),
+    review_text != "",
+    !is.na(rating),
+    rating >= 1 & rating <= 5
+  ) %>%
+  mutate(
+    sentiment = case_when(
+      rating >= 4 ~ "positive",
+      rating <= 2 ~ "negative",
+      TRUE ~ "neutral"
+    )
+  )
+
+nrow(amazon_reviews_clean)
+amazon_reviews_clean %>% count(rating)
+```
+
+Now create the binary classification dataset. We remove 3-star reviews so that today's outcome has two clearly defined categories.
+
+```{r prepare-classification}
+amazon_classification <- amazon_reviews_clean %>%
+  filter(sentiment != "neutral") %>%
+  mutate(
+    sentiment = factor(sentiment, levels = c("negative", "positive"))
+  ) %>%
+  select(review_text, sentiment, rating, word_count)
+
+amazon_classification %>% count(sentiment)
+```
+
+Why make `sentiment` a factor? Classification models treat the outcome as a set of categories. Setting the factor order explicitly also makes our later interpretation reproducible: `negative` is the first level and `positive` is the second level.
+
+## Look at a few examples {-}
+
+Before fitting a model, always inspect the data you are asking it to learn from.
+
+```{r examples}
+set.seed(381)
+
+amazon_classification %>%
+  group_by(sentiment) %>%
+  slice_sample(n = 3) %>%
+  ungroup() %>%
+  mutate(review_text = str_trunc(review_text, 180)) %>%
+  select(sentiment, rating, review_text)
+```
+
+**Think about it:** Do all examples look consistent with the label created from the star rating? Can you imagine cases where the text and rating might disagree?
+
+## Check class balance {-}
+
+Classification data are often **imbalanced**, meaning one class occurs more frequently than another. This matters because a model can appear accurate simply by predicting the majority class every time.
+
+```{r class-balance}
+class_dist <- amazon_classification %>%
+  count(sentiment) %>%
+  mutate(pct = n / sum(n))
+
+class_dist
+
+ggplot(amazon_classification, aes(x = sentiment, fill = sentiment)) +
+  geom_bar(show.legend = FALSE) +
+  labs(
+    title = "Class Distribution in the Amazon Review Data",
+    x = NULL,
+    y = "Number of reviews"
+  ) +
+  theme_minimal()
+```
+
+The majority-class baseline is simply the share of observations in the most common class. A useful classifier should do better than blindly guessing the majority class.
+
+```{r majority-baseline}
+majority_baseline <- max(class_dist$pct)
+majority_baseline
+```
+
+# Text as Features {-}
+
+Last week, we tokenized text and removed stop words. The same idea appears inside our machine-learning workflow, but now we also need to convert each document into numerical features that a statistical model can use.
+
+A simple representation is a **bag of words**: each document is represented by counts or weights for the words it contains. The word order is mostly ignored, but the presence and frequency of terms become numerical predictors.
+
+## TF-IDF {-}
+
+Today we use **TF-IDF**, short for **term frequency-inverse document frequency**.
+
+- **Term frequency (TF):** How often does a word appear in this document?
+- **Inverse document frequency (IDF):** How rare is that word across all documents?
+- **TF-IDF:** Gives more weight to words that are important in a particular document but are not common everywhere.
+
+For example, a word that appears in nearly every Amazon review may not help much with classification. A word that appears disproportionately in positive or negative reviews may be more informative.
+
+Our preprocessing pipeline will therefore be:
+
+```
+Review text
+   ↓
+Tokenize into words
+   ↓
+Remove stop words
+   ↓
+Keep a manageable vocabulary
+   ↓
+Calculate TF-IDF
+   ↓
+Numeric features for the classifier
+```
+
+# Split the Data {-}
+
+We will first hold out 20% of the data as the final test set. Then we split the remaining 80% so that 60% of the full data becomes training data and 20% becomes validation data.
+
+We use **stratified sampling** so that the positive/negative proportions remain similar across the splits.
+
+```{r split-data}
+set.seed(381)
+
+# First split: 80% development data, 20% final test data
+split_test <- initial_split(
+  amazon_classification,
+  prop = 0.80,
+  strata = sentiment
+)
+
+train_validation <- training(split_test)
+test_class <- testing(split_test)
+
+# Second split: 75% of the development data for training,
+# 25% for validation (which becomes about 60/20 of the full dataset)
+split_validation <- initial_split(
+  train_validation,
+  prop = 0.75,
+  strata = sentiment
+)
+
+train_class <- training(split_validation)
+validation_class <- testing(split_validation)
+
+cat("Training:", nrow(train_class), "\n")
+cat("Validation:", nrow(validation_class), "\n")
+cat("Test:", nrow(test_class), "\n")
+```
+
+Check that stratification preserved the class balance.
+
+```{r check-strata}
+train_class %>%
+  count(sentiment) %>%
+  mutate(pct = n / sum(n))
+
+validation_class %>%
+  count(sentiment) %>%
+  mutate(pct = n / sum(n))
+
+test_class %>%
+  count(sentiment) %>%
+  mutate(pct = n / sum(n))
+```
+
+From this point forward, pretend the **test set is locked away**. We will not use it to make modeling decisions.
+
+# Build a Text Classifier {-}
+
+A `tidymodels` workflow separates the problem into two pieces:
+
+1. **Recipe:** How should the raw data be transformed into model-ready features?
+2. **Model:** What statistical algorithm should learn from those features?
+
+We then combine the recipe and model into a **workflow**.
+
+## Step 1: Define the text preprocessing recipe {-}
+
+```{r preprocess-class}
+preprocess_class <- recipe(sentiment ~ review_text, data = train_class) %>%
+  step_tokenize(review_text) %>%
+  step_stopwords(review_text) %>%
+  step_tokenfilter(review_text, max_tokens = 1000) %>%
+  step_tfidf(review_text)
+
+preprocess_class
+```
+
+What does each line do?
+
+1. `recipe(sentiment ~ review_text, ...)` tells R that we want to predict `sentiment` from `review_text`.
+2. `step_tokenize()` splits each review into word tokens.
+3. `step_stopwords()` removes common stop words.
+4. `step_tokenfilter(max_tokens = 1000)` keeps the 1,000 most frequent tokens so the model stays manageable for today's exercise.
+5. `step_tfidf()` converts the remaining tokens into TF-IDF features.
+
+Notice that the recipe is only a **plan** at this stage. The preprocessing parameters are learned when the workflow is fitted to training data.
+
+## Step 2: Choose a classification model {-}
+
+We will use **logistic regression**, a common baseline model for binary classification.
+
+```{r model-class}
+model_class <- logistic_reg() %>%
+  set_engine("glm") %>%
+  set_mode("classification")
+
+model_class
+```
+
+Why logistic regression?
+
+- It is relatively simple and fast.
+- It naturally handles a binary outcome.
+- Its coefficients are interpretable.
+- It provides a useful baseline before trying more complex algorithms.
+
+## Step 3: Combine recipe + model into a workflow {-}
+
+```{r workflow-class}
+pipeline_class <- workflow() %>%
+  add_recipe(preprocess_class) %>%
+  add_model(model_class)
+
+pipeline_class
+```
+
+The workflow makes sure that the same text-processing steps are used consistently during training and prediction.
+
+## Step 4: Fit the model on the training set {-}
+
+```{r fit-class}
+fit_class <- pipeline_class %>%
+  fit(data = train_class)
+
+fit_class
+```
+
+When `fit()` runs, the workflow:
+
+1. learns the text preprocessing from the training data,
+2. converts the reviews into TF-IDF features, and
+3. estimates the logistic regression coefficients.
+
+The validation and test reviews have not been used to estimate this model.
+
+# Validation: Check the Workflow {-}
+
+The validation set lets us inspect performance while we are still developing the workflow.
+
+```{r predict-validation}
+pred_validation <- bind_cols(
+  validation_class,
+  predict(fit_class, new_data = validation_class),
+  predict(fit_class, new_data = validation_class, type = "prob")
+)
+
+pred_validation %>%
+  select(review_text, sentiment, .pred_class, .pred_positive) %>%
+  slice_sample(n = 10)
+```
+
+Calculate a few validation metrics.
+
+```{r validation-metrics}
+pred_validation %>%
+  metrics(truth = sentiment, estimate = .pred_class)
+```
+
+At this point, validation data could be used to compare choices such as:
+
+- 500 vs. 1,000 vs. 2,000 tokens,
+- different preprocessing steps,
+- logistic regression vs. another classifier.
+
+We will keep the workflow as-is today. The important principle is that these decisions should be made with training/validation data, **not by repeatedly checking the test set**.
+
+# Final Model and Test-Set Evaluation {-}
+
+Now that the workflow is finalized, refit it using all of the development data (training + validation). We still leave the test set untouched.
+
+```{r final-fit}
+final_fit <- pipeline_class %>%
+  fit(data = train_validation)
+```
+
+Make predictions on the test set.
+
+```{r predict-test}
+pred_test <- bind_cols(
+  test_class,
+  predict(final_fit, new_data = test_class),
+  predict(final_fit, new_data = test_class, type = "prob")
+)
+
+pred_test %>%
+  select(review_text, sentiment, .pred_class, .pred_positive) %>%
+  slice_sample(n = 10)
+```
+
+## Confusion matrix {-}
+
+A **confusion matrix** compares the true labels with the predicted labels.
+
+```{r confusion-matrix}
+conf_mat_class <- pred_test %>%
+  conf_mat(truth = sentiment, estimate = .pred_class)
+
+conf_mat_class
+
+autoplot(conf_mat_class, type = "heatmap") +
+  labs(title = "Confusion Matrix: Amazon Review Sentiment") +
+  theme_minimal()
+```
+
+For a binary positive/negative task, there are four possible outcomes:
+
+- **True positive (TP):** predicted positive, actually positive.
+- **False positive (FP):** predicted positive, actually negative.
+- **False negative (FN):** predicted negative, actually positive.
+- **True negative (TN):** predicted negative, actually negative.
+
+The labels "positive" and "negative" in this language refer to the class we designate as the event, not whether an outcome is morally good or bad.
+
+## Accuracy and kappa {-}
+
+```{r test-metrics}
+test_metrics <- pred_test %>%
+  metrics(truth = sentiment, estimate = .pred_class)
+
+test_metrics
+```
+
+Two metrics shown here are:
+
+- **Accuracy:** the proportion of all predictions that are correct.
+- **Kappa:** agreement between predictions and truth after accounting for agreement expected by chance.
+
+Accuracy is intuitive, but it can be misleading when the classes are imbalanced. That is why we compare it with a simple majority-class baseline.
+
+```{r baseline-comparison}
+test_baseline <- test_class %>%
+  count(sentiment) %>%
+  mutate(pct = n / sum(n)) %>%
+  summarize(baseline_accuracy = max(pct)) %>%
+  pull(baseline_accuracy)
+
+model_accuracy <- test_metrics %>%
+  filter(.metric == "accuracy") %>%
+  pull(.estimate)
+
+cat("Majority-class baseline:", round(test_baseline * 100, 1), "%\n")
+cat("Model accuracy:", round(model_accuracy * 100, 1), "%\n")
+cat("Improvement:", round((model_accuracy - test_baseline) * 100, 1), "percentage points\n")
+```
+
+**Think about it:** If the model's accuracy is only slightly above the majority-class baseline, would you consider the classifier useful? What else would you want to know before answering?
+
+## Precision, recall, and F1-score {-}
+
+For imbalanced classification, we often care about performance on a particular class. Here we treat **positive reviews** as the event by setting `event_level = "second"`, because `positive` is the second level of our factor.
+
+```{r class-metrics}
+class_metrics <- bind_rows(
+  precision(
+    pred_test,
+    truth = sentiment,
+    estimate = .pred_class,
+    event_level = "second"
+  ),
+  recall(
+    pred_test,
+    truth = sentiment,
+    estimate = .pred_class,
+    event_level = "second"
+  ),
+  f_meas(
+    pred_test,
+    truth = sentiment,
+    estimate = .pred_class,
+    event_level = "second"
+  )
+)
+
+class_metrics
+```
+
+How should we read these metrics?
+
+- **Precision:** Of all reviews predicted to be positive, what proportion were actually positive?
+- **Recall:** Of all truly positive reviews, what proportion did the model identify?
+- **F1-score:** A harmonic mean that balances precision and recall.
+
+There is often a trade-off between precision and recall. Which one matters more depends on the research or practical goal.
+
+# Interpret What the Model Learned {-}
+
+## Inspect influential words {-}
+
+Because logistic regression is interpretable, we can inspect the fitted coefficients. Positive coefficients are associated with a higher probability of the `positive` class; negative coefficients are associated with a lower probability of the `positive` class.
+
+```{r feature-importance}
+coefs <- final_fit %>%
+  extract_fit_parsnip() %>%
+  tidy() %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    term = str_remove(term, "^tfidf_review_text_"),
+    abs_estimate = abs(estimate)
+  )
+
+top20 <- coefs %>%
+  slice_max(abs_estimate, n = 20, with_ties = FALSE)
+
+ggplot(top20, aes(x = reorder(term, estimate), y = estimate, fill = estimate > 0)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  labs(
+    title = "Words with the Largest Logistic Regression Coefficients",
+    x = "Word",
+    y = "Coefficient"
+  ) +
+  theme_minimal()
+```
+
+You can also inspect the strongest words in each direction directly.
+
+```{r coefficient-tables}
+coefs %>%
+  slice_max(estimate, n = 10, with_ties = FALSE) %>%
+  select(term, estimate)
+
+coefs %>%
+  slice_min(estimate, n = 10, with_ties = FALSE) %>%
+  select(term, estimate)
+```
+
+**Important:** These coefficients show associations learned by this model from this dataset. They are not causal effects, and they do not tell us that a word is inherently positive or negative in every context.
+
+## Inspect mistakes {-}
+
+Aggregate metrics can hide interesting failure cases. Looking at misclassified reviews helps us understand what the model misses.
+
+```{r inspect-errors}
+pred_test %>%
+  filter(sentiment != .pred_class) %>%
+  mutate(review_text = str_trunc(review_text, 220)) %>%
+  select(sentiment, .pred_class, .pred_positive, review_text) %>%
+  slice_sample(n = 10)
+```
+
+As you inspect the errors, consider:
+
+- Is the review sarcastic or ambiguous?
+- Does it contain both positive and negative language?
+- Does the written review conflict with the star rating?
+- Is the prediction close to 50/50, or is the model confidently wrong?
+- Could preprocessing have removed information that matters?
+
+This error analysis is an important part of evaluating any automated text classifier.
+
+# In-Class Exercise {-}
+
+Choose **one** of the following small modifications. Use the validation set—not the final test set—to see whether your change helps.
+
+1. Change `max_tokens = 1000` to `500` or `2000`.
+2. Remove `step_stopwords()` and see what happens.
+3. Find five validation reviews the model classifies incorrectly and describe a pattern in the errors.
+
+For options 1 or 2, compare the validation accuracy before and after the change. Do not decide based on test-set performance.
+
+**Question:** What changed, and why do you think it changed?
+
+# Extended Learning: Regression {-}
+
+Classification predicts a category. We can also use the review text to predict the original numeric rating from 1 to 5. This is a **regression** problem.
+
+The workflow looks very similar, but we change the outcome, model, and evaluation metrics. The following code is optional self-learning rather than the main in-class exercise.
+
+```{r regression-extension, eval=FALSE}
+amazon_regression <- amazon_reviews_clean %>%
+  select(review_text, rating)
+
+set.seed(381)
+split_reg <- initial_split(amazon_regression, prop = 0.80)
+train_reg <- training(split_reg)
+test_reg <- testing(split_reg)
+
+preprocess_reg <- recipe(rating ~ review_text, data = train_reg) %>%
+  step_tokenize(review_text) %>%
+  step_stopwords(review_text) %>%
+  step_tokenfilter(review_text, max_tokens = 1000) %>%
+  step_tfidf(review_text)
+
+model_reg <- linear_reg() %>%
+  set_engine("lm") %>%
+  set_mode("regression")
+
+workflow_reg <- workflow() %>%
+  add_recipe(preprocess_reg) %>%
+  add_model(model_reg)
+
+fit_reg <- workflow_reg %>%
+  fit(data = train_reg)
+
+pred_reg <- bind_cols(
+  test_reg,
+  predict(fit_reg, new_data = test_reg)
+)
+
+pred_reg %>%
+  metrics(truth = rating, estimate = .pred)
+```
+
+For regression, common evaluation metrics include:
+
+- **RMSE (Root Mean Squared Error):** typical prediction error in the units of the outcome; lower is better.
+- **R-squared:** the proportion of variation in the outcome explained by the model; higher generally indicates better fit.
+
+# Wrap-up {-}
+
+Today we moved from **describing text** to **predicting labels from text**.
+
+Key takeaways:
+
+1. **Supervised learning requires labeled examples.** Labels may already exist or may need to be created with a clear codebook.
+2. **Classification predicts categories; regression predicts numbers.**
+3. **Training, validation, and test data serve different purposes.** Do not repeatedly use the test set while making modeling decisions.
+4. **Text must be converted into numerical features.** Today we used tokenization, stop-word removal, vocabulary filtering, and TF-IDF.
+5. **A workflow combines preprocessing and a model.** This helps us apply exactly the same transformations to new data.
+6. **Accuracy alone is not enough.** Compare against a baseline and inspect precision, recall, F1-score, and the confusion matrix.
+7. **Interpretation and error analysis matter.** A model's mistakes can reveal ambiguity, label problems, preprocessing limitations, or patterns the model failed to learn.
+
+For extended learning, see:
+
+- [Tidymodels](https://www.tidymodels.org/)
+- [Text Mining with R](https://www.tidytextmining.com/)
+- [Supervised Machine Learning for Text Analysis in R](https://smltar.com/)
+
+*Updated for J381M Fall 2026. Adapted from the Spring 2026 Week 5 tutorial prepared by Sungwon Jung.*
