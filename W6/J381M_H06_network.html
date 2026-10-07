@@ -11,7 +11,6 @@
 
 <meta name="author" content="Shengchun Huang" />
 
-<meta name="date" content="2026-02-19" />
 
 <title>J381M_H06_network</title>
 
@@ -1670,7 +1669,6 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">J381M_H06_network</h1>
 <h4 class="author">Shengchun Huang</h4>
-<h4 class="date">2026-02-19</h4>
 
 </div>
 
@@ -1756,9 +1754,9 @@ columns and create the edge list.)</p>
 <span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>g <span class="ot">&lt;-</span> <span class="fu">graph_from_edgelist</span>(<span class="fu">as.matrix</span>(GoT), <span class="co"># rearranging the data as matrix </span></span>
 <span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>                          <span class="at">directed =</span> F) <span class="co"># directions are not specified</span></span>
 <span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>g <span class="co"># &quot;g&quot; here is the graph object. You can check its properties by using the summary function.</span></span></code></pre></div>
-<pre><code>## IGRAPH d171a68 UN-- 107 352 -- 
+<pre><code>## IGRAPH e46a120 UN-- 107 352 -- 
 ## + attr: name (v/c)
-## + edges from d171a68 (vertex names):
+## + edges from e46a120 (vertex names):
 ##  [1] Aemon  --Grenn     Aemon  --Samwell   Aerys  --Jaime     Aerys  --Robert   
 ##  [5] Aerys  --Tyrion    Aerys  --Tywin     Alliser--Mance     Amory  --Oberyn   
 ##  [9] Arya   --Anguy     Arya   --Beric     Arya   --Bran      Arya   --Brynden  
@@ -1769,7 +1767,7 @@ columns and create the edge list.)</p>
 ## [29] Beric  --Gendry    Beric  --Thoros    Bran   --Hodor     Bran   --Jojen    
 ## + ... omitted several edges</code></pre>
 <div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">summary</span>(g)</span></code></pre></div>
-<pre><code>## IGRAPH d171a68 UN-- 107 352 -- 
+<pre><code>## IGRAPH e46a120 UN-- 107 352 -- 
 ## + attr: name (v/c)</code></pre>
 <div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># visualization</span></span>
 <span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">png</span>(<span class="at">filename =</span> <span class="st">&quot;GoT.png&quot;</span>, <span class="at">width =</span> <span class="dv">1600</span>, <span class="at">height =</span> <span class="dv">1400</span>) <span class="do">## save it to png</span></span>
@@ -1803,7 +1801,7 @@ columns and create the edge list.)</p>
 in the network?</p>
 <div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="co"># take a closer look at the network</span></span>
 <span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="fu">V</span>(g) <span class="co"># V() is the function to extract the vertices of the graph. It returns a vertex sequence, which is a list of all the nodes in the graph. Each node has an attribute called &quot;name&quot;, which is the label of the node. We can use this attribute to locate the node labeled &quot;Jon&quot;.</span></span></code></pre></div>
-<pre><code>## + 107/107 vertices, named, from d171a68:
+<pre><code>## + 107/107 vertices, named, from e46a120:
 ##   [1] Aemon        Grenn        Samwell      Aerys        Jaime       
 ##   [6] Robert       Tyrion       Tywin        Alliser      Mance       
 ##  [11] Amory        Oberyn       Arya         Anguy        Beric       
@@ -1854,14 +1852,14 @@ has (the degree of the node).</p>
 <span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a><span class="co"># nodes = &quot;Jon&quot; means we want to extract the ego network of the node labeled &quot; Jon&quot;. You can also use the index of the node instead of the label, for example, nodes = 1 if Jon is the first node in the vertex sequence.</span></span>
 <span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a>ego_j <span class="co"># this will return a list of the ego network of Jon, which includes Jon and his neighbors.</span></span></code></pre></div>
 <pre><code>## [[1]]
-## + 27/107 vertices, named, from d171a68:
+## + 27/107 vertices, named, from e46a120:
 ##  [1] Jon         Aemon       Grenn       Samwell     Robert      Alliser    
 ##  [7] Mance       Arya        Bran        Meera       Theon       Robb       
 ## [13] Sansa       Stannis     Craster     Eddard      Eddison     Gilly      
 ## [19] Janos       Dalla       Melisandre  Orell       Qhorin      Rattleshirt
 ## [25] Styr        Val         Ygritte</code></pre>
 <div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a>ego_j[[<span class="dv">1</span>]] <span class="co"># did you notice the differences between the outputs? </span></span></code></pre></div>
-<pre><code>## + 27/107 vertices, named, from d171a68:
+<pre><code>## + 27/107 vertices, named, from e46a120:
 ##  [1] Jon         Aemon       Grenn       Samwell     Robert      Alliser    
 ##  [7] Mance       Arya        Bran        Meera       Theon       Robb       
 ## [13] Sansa       Stannis     Craster     Eddard      Eddison     Gilly      
@@ -1870,7 +1868,7 @@ has (the degree of the node).</p>
 <div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>neighbors_j <span class="ot">&lt;-</span> <span class="fu">neighbors</span>(g, <span class="at">v =</span> <span class="st">&quot;Jon&quot;</span>) <span class="co"># this function is to extract the neighbors of a given node. </span></span>
 <span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a><span class="co"># v = &quot;Jon&quot; means we want to extract the neighbors of the node labeled &quot;Jon&quot;. You can also use the index of the node instead of the label, for example, v = 1 if Jon is the first node in the vertex sequence.</span></span>
 <span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>neighbors_j <span class="co"># this will return a vertex sequence of the neighbors of Jon, which does not include Jon himself.</span></span></code></pre></div>
-<pre><code>## + 26/107 vertices, named, from d171a68:
+<pre><code>## + 26/107 vertices, named, from e46a120:
 ##  [1] Aemon       Grenn       Samwell     Robert      Alliser     Mance      
 ##  [7] Arya        Bran        Meera       Theon       Robb        Sansa      
 ## [13] Stannis     Craster     Eddard      Eddison     Gilly       Janos      
@@ -1879,9 +1877,9 @@ has (the degree of the node).</p>
 <div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a>jon <span class="ot">&lt;-</span> <span class="fu">make_ego_graph</span>(g, <span class="at">order =</span> <span class="dv">1</span>, <span class="at">nodes =</span> <span class="st">&quot;Jon&quot;</span>) <span class="co"># this function is to create a subgraph of the ego network of a given node. It will return a graph object that contains only the ego and its neighbors, and the edges between them. You can visualize this subgraph to see the local structure around Jon.</span></span>
 <span id="cb24-2"><a href="#cb24-2" tabindex="-1"></a>jon</span></code></pre></div>
 <pre><code>## [[1]]
-## IGRAPH 9c60ffc UN-- 27 77 -- 
+## IGRAPH 5109921 UN-- 27 77 -- 
 ## + attr: name (v/c)
-## + edges from 9c60ffc (vertex names):
+## + edges from 5109921 (vertex names):
 ##  [1] Aemon  --Grenn   Aemon  --Samwell Grenn  --Samwell Aemon  --Robert 
 ##  [5] Samwell--Mance   Alliser--Mance   Robert --Arya    Samwell--Bran   
 ##  [9] Arya   --Bran    Aemon  --Jon     Grenn  --Jon     Samwell--Jon    
