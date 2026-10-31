@@ -1,0 +1,116 @@
+---
+title: "J381M_11_AI"
+author: "Shengchun Huang"
+output: 
+  html_document:
+    code_folding: show
+    highlight: haddock
+    number_sections: yes
+    theme: lumen
+    toc: yes
+    toc_depth: 4
+    toc_float: yes
+urlcolor: blue
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+\pagebreak
+
+# Objectives {-}
+
+Welcome back to J381M! 
+
+This week, we will approach the world of AI. 
+
+% terminology box for today:
+- model & reasoning setup
+- prompt
+- token
+- skill
+- agent
+- chat / work mode
+- project & memory of AI (how to get AI know you and assist you better, while keep privacy)
+- vibe coding
+- metacognitive reflection (you know when to correctly judge right or wrong of the AI outputs)
+- cognitive offloading: human cognition nature, not because you are sloppy, but it is very hard to resist (and you might feel you've learned, when you actually didn't)
+
+-- what are the available AI tools?
+
+Free for UT students: ChatGPT EDU and Claude EDU (highest reasoning level: ultra; GPT 6.1 Sol, Astra; what about Claude?) -- the usage is not much, if you use it on the highest level, the token runs up quickly --- appropriately select the model and reasoning efforts for your task that you ask AI to do
+
+Free plans for researchers if you apply (search currently accessible discountes)
+
+List up the popular models (and at what task, which outperforms others, recommended model & reasoning set up)
+- ChatGPT
+ -- particularly perform badly when you use Chinese to prompt it (supported by literature)
+- Claude
+
+- Gemini
+- (what is the one by Meta)?
+- Grok (not sure if you would use it)
+- DeepSeek and other Chinese ones: 
+
+Key content component for this class:
+
+% what AI can do for us in research / research-related work? 
+% what is the danger?
+% how can we use AI effectively and safely?
+
+-- efficiently:
+
+1) token & usage planning: appropriately select the model and reasoning efforts for your task that you ask AI to do
+ --- outline what AI model works better on which job
+
+2) prompts: how can you effectively prompt AI to do the job as planned? make it concrete and detail ---> actually, it needs YOU to define your questions clear first (how to ask the right question is the key of AI use today)
+
+ --- another thing you need to know: we no longer need "skills". just ask AI use your plain language (some recent report/discussion on this; use a developed skill might even make the task worse)
+ --- when you find AI is getting you unsatisfied answers, spending a lot of time fine-tuning prompts can be a waste of time. Instead, re-edit the prompt and generate the response again.
+ 
+
+3) take advantage of projects and memory appropriately; use "temporary chat" for things you do not want it to save to memory; toggle off the "use your data to train model for everyone" (I'll include a screenshot of it here, and the instruction where to turn it off)
+
+4) AI sometimes can do very bad job on simple tasks, such as writing arguments (they do not know how to reason, particularly not how to argue sharply and coherently), or generating random numbers (they ), but they do great on: 
+
+
+- inspecting codes --- they can easily capture typos or formatting inconsistency
+- generating codes --- many people have said it is good, and many social scientists (or all the coding engineers that I know of today uses AI to code) --- but nah, it is not that good. It often overcomplicates things. My strategy: I have some written-up scripts saved, such as plotting template, modeling template, and data processing scripts. If I want to use any of them, I go back to my learned knowledge/notes, rather than start from *vibe coding*. Once I already know what codes I'd like to see, I use AI to complete it step by step --- this is a more strict requirement than people who work on software development etc., because we as researchers have to be responsible for our methodology, analysis, and outputs, and AI can make serious hallucination without being noticed --- the most dangerous thing is, when you see it as doing okay at 99% of the time, and it actually gives you the wrong coding at the 1%, and you do not capture that. 
+
+- find literature --- they are able to search sometimes beyond your narrow search scope, better than google scholar (this is also by nature a search engine and a curator!), but, AI does not know which paper is a high-quality work --- so you as the researcher need to differentiate it by your OWN EYES!
+- proofreading --- I have very mixed attitudes towards it. AI's proofreading sometimes can change your key concept into something inaccurate, or it uses some writing terms that are uncommon for researchers in our field --- particularly can be a trap for non-native speaker authors/international students. But meanwhile, it does contribute to flattening the learning curve for non-native speakers to write in a more smooth way
+
+
+%% caution!!: AI outputs leave very bad impression on people who read your work
+
+- Using AI-generated slides to present your work at conference? well, many people, including some seniors are already doing this. But I can fairly tell you that the audience see this presenter as sloppy, particularly when the audience capture mistakes from the generated slide page. -- what is the right way to do? Draft the presentation logic on your own, have AI assist the language/text polishing, provide aesthetic suggestions, rather than directly output a pptx. (I've tried have it output directly, and it was not as good as I wanted it to be.)
+
+- Using AI-generated research papers to submit? Reviewers can easily tell it is generated by AI and they see you as a sloppy author again. They will not tell you this directly, but they will tell you this paper is a bad and not solid for ABC reasons. In other words, if you can use AI to generate a very high-quality paper, then you are good to go --- but, if you are able to make that judgment, you are already a good researcher :) 
+
+- Sending AI-generated analysis codes/figures/RA work/email back to your advisor, or your professor, your collaborator, etc. --- fairly speaking, your advisor/PI can easily tell that you did not use your own brain to work on this, and they will see you as sloppy, careless, not solid --- for any type of coworking relationship, this destroys trust deeply. They might or might not tell you what they think, but I am now telling you this is the consequence: you will be quietly removed from many opportunities because you lost this trust from them, for your sloppiness in AI use, or suspicion on integrity. 
+
+%% How do I use AI now?
+
+- I use AI to assist my work only (I rarely feed my personal information - health, finance, etc. to it directly. If I do have some personal question to ask, I use the temporary chat. I am very cautious to use AI for therapy/emotional conversations --- because people can be extremely vulnerable and be less cognitive vigilant to notice AI is guiding you into a dangerous situation (cite the recent news about AI leading people to death/suicide, and the safeguards do not always work)). Some people have used AI for health inspection, or suggestions, but I do not trust it yet. I recommend not to, or even do that, do not have AI judgment override your doctor. If you have suspicion, find a second advice is better than say your doctor is wrong and AI is right. 
+
+
+
+- I separate different AI models to do different things -- I do not want one AI/company to have omninous information about me. And I use Chrome gemini often for quick ask questions, so that it doesn't save it (I turned off all the memories and privacy settings.)
+
+- I use different AI models to assist different types of work
+ --- writing research papers: I feed my first draft to AI to get grammar check and proofreading, but I often need to do the full rewriting/editing to make sure it reflects what **I** want to argue, not just seemingly right sentences. I use web chats for this.
+ --- analysis, brainstorm, lit review: I discuss with AI when I am debating with myself on some core decisions, but I hand write the initial thoughts first, before I see the AI outputs (and interestingly, sometimes after I type all the concerns with AI, I realized what would be the best decision to go. In other words, if you are able to ask the right question, or when you are able to clarify the question, you are halfway of the success) The key is, never let AI to make any core research decisions for you: what a RQ is, what the key concept is, how is it measured, how to operationalize the variable, how to construct the model. How to make sure about this? Record whatever your research
+ 
+ --- code: when I am able to define very bounded jobs on coding, i.e., I know how each variable is constructed, how data is processed, how model is constructed, I prompt it to Codex agent to write the code for me --- but I merely use it for preliminary analysis, rather than the formal analysis in the submitted paper. All the papers that I submit until today, are built on scripts I hand write. When I copy and paste some chunks of codes, I read them line by line and make sure I understand each function/argument. It is similar to the old days we copy and paste, also learn coding from Stackflow. The key here is that I am responsible for the rightness of my script, not AI. If taking AI away from me, I am 100 percent sure that I can regenerate the analysis that I have, only slower. 
+ 
+ --- learn new things: I have AI to generate quick overview, and **cite the original link** so that I can go to that page to verify it directly, particularly core statistical model, concepts, and calculations. I still use my own eyes to read papers, and read books.  
+
+ --- I link ChatGPT to my google drive and outlook: for managing my daily schedule, to-dos, and task completions. I also find google drive useful because I do not need to paste the content on the document again and again to the chat window, but merely cite the source so that AI knows where to find the file and read it directly. I never let AI to write the file directly in those folders. I do not allow that permission. If I want the agent to do something for me, I set up an independent, isolated work path for that work, and only bounded job like preliminary exploration to be done. 
+ 
+ 
+ 
+
+

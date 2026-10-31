@@ -1,7 +1,6 @@
 ---
 title: "J381M_H08_Linear Regression"
-author: "Xinya Jiang"
-date: "2026-03-05"
+date: "2026-10-19"
 output: 
   html_document:
     code_folding: show
@@ -318,3 +317,6 @@ It balances two things:
 * How complex the model is
 
 Lower AIC → better model (when comparing models fit to the same data)
+
+
+(Acknowledgement: thank you to Xinya Jiang's guest tutorial in J381M, Spring 2026; the content of this tutorial was co-developed by Shengchun and Xinya.)

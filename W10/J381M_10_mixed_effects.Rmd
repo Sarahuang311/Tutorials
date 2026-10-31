@@ -1,7 +1,6 @@
 ---
 title: "J381M_10_MEM"
 author: "Shengchun Huang"
-date: "2026-03-12"
 output: 
   html_document:
     code_folding: show

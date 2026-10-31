@@ -1,0 +1,251 @@
+---
+title: "J381M_11_AI: Working With AI as a Researcher"
+author: "Shengchun Huang"
+output:
+  html_document:
+    code_folding: show
+    highlight: haddock
+    number_sections: yes
+    theme: lumen
+    toc: yes
+    toc_depth: 4
+    toc_float: yes
+urlcolor: blue
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+# This chunk sets the defaults for code examples in the handout.
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+options(scipen = 0, digits = 3)
+```
+
+\pagebreak
+
+# Objectives {-}
+
+Welcome back to J381M! This week, we will explore generative AI not just as something to *use*, but as something to *evaluate*. We have already worked with R, text analysis, networks, and statistical models. AI can help with all these tasks, but it can also generate plausible-looking mistakes.
+
+**My central message: AI is your assistant, not your researcher. You remain the pilot.** The goal today is not to learn a perfect prompt or memorize which model is best. It is to learn how to define a task, delegate a bounded part of it, and independently judge the result.
+
+By the end of this tutorial, you should be able to:
+
+1. Distinguish several common ways of using AI (chat, source-backed search, coding support, and more autonomous agents).
+2. Write a clear prompt with context, task, constraints, and a way to evaluate the output.
+3. Use AI to help debug R code **without** surrendering responsibility for the analysis.
+4. Verify a claim or research reference against an original source.
+5. Make an informed decision about when **not** to use AI, particularly with research data.
+
+**Plan for today (about 60 minutes):**
+
+| Section | Approximate time |
+|:--|--:|
+| 1. What can AI do for research? | 8 min |
+| 2. Practice 1: Define a task and improve a prompt | 12 min |
+| 3. Practice 2: Debug and audit R code | 20 min |
+| 4. Practice 3: Check a research claim | 12 min |
+| 5. Privacy, boundaries, and reflection | 8 min |
+
+You do **not** need to read every linked article during this hour. The section **Extended learning** is for those who want to explore further.
+
+# 1. What can AI do for research? {-}
+
+AI systems are useful across several *different kinds of tasks*. Do not confuse a **model** (the underlying system) with a **product or feature** (the way you interact with it).
+
+| Mode or function | Example of a bounded research use | What you still need to check |
+|:--|:--|:--|
+| **Chat / explanation** | Ask for an intuitive explanation of a statistical concept | Compare with the textbook, article, or original documentation |
+| **Web- or source-backed search** | Discover literature outside your usual keywords | Whether each paper exists, is relevant, and supports the claim |
+| **Coding assistant** | Explain an error, suggest a `dplyr` pipeline, inspect a script | Run the code, examine intermediate data, and verify the computation |
+| **Document or writing feedback** | Identify unclear transitions or inconsistent terminology | Whether edits preserve your argument and disciplinary meaning |
+| **Agent / multi-step workflow** | Organize public files in a *separate test folder* | The agent's permissions, intermediate actions, and final changes |
+
+**Where can you start?** UT Austin currently offers [ChatGPT EDU and Claude EDU](https://tech.utexas.edu/services-tools/ai) to students through university-supported access. You can also encounter tools such as Gemini, Copilot, open-weight models from the Llama family, or DeepSeek. Their capabilities, available features, and limits change frequently. Rather than relying on a permanent "best model" ranking, choose based on **(a) task, (b) data sensitivity, (c) need for source access, and (d) how easily you can verify the output**.
+
+A useful rule of thumb: start with an ordinary, reasonably capable model for a small task. Use more intensive reasoning or agent features only when the task needs them. More computation or a longer answer does not automatically mean a better answer.
+
+**For researchers, I find these distinctions especially important:**
+
+- **Good candidates for assistance:** explaining unfamiliar syntax, spotting a typo, brainstorming alternative search terms, proofreading *your own* prose, and creating a first-pass code draft from a clearly specified plan.
+- **Tasks that require much greater care:** literature synthesis, selecting a method, operationalizing a concept, designing a statistical model, classifying research data, and interpreting findings.
+- **Decisions you own:** the research question, theoretical argument, measurement validity, analytical strategy, and conclusions. An AI output may inform those decisions but cannot justify them by itself.
+
+As an example from computational social science, [Bail (2024)](https://doi.org/10.1073/pnas.2314021121) discusses opportunities for generative AI in social science *and* concerns about bias, ethics, replication, and poor-quality research. We will return to this article in Practice 3.
+
+# 2. Practice 1: Define the task before writing the prompt (12 min) {-}
+
+A prompt is not a magic spell. The most important step often happens **before** you type: deciding what you need the tool to do, which information it needs, and what a satisfactory result would look like.
+
+A practical starting structure is:
+
+> **Context:** I am a graduate student working on a computational media research project.  
+> **Task:** Explain [one specific question or problem].  
+> **Constraints:** Use [the method or functions I specify]. Do not invent variables, data, or references.  
+> **Output:** Give me [a short explanation / code / table] and identify uncertainties.  
+> **Verification:** Tell me what I should check myself.
+
+This is a starting point, not a formula you must use in every chat. See [OpenAI's prompt-writing guidance](https://help.openai.com/en/articles/10032626) or [Anthropic's prompting guide](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices) for examples of clear, specific instructions.
+
+## Try it: Vague versus bounded prompts {-}
+
+**Step A (2 min).** In a UT-supported AI chat, ask:
+
+> How do I analyze social media engagement in R?
+
+Notice what the AI assumes. Did it invent a dataset, suggest unnecessary models, or give you more than you need?
+
+**Step B (5 min).** Now try a more bounded request:
+
+> I have a data frame called `posts` with variables `outlet` (character) and `likes` (numeric, sometimes missing). I want the **mean number of likes per outlet**, excluding missing values from the mean. Use `dplyr` functions we have learned. First outline the operation in plain English, then give the shortest readable code. Explain how missing values affect the calculation and give me one way to check the result. Do not assume any other variables exist.
+
+**Step C (5 min).** Compare the two responses. Which would be easier to audit? Revise the better prompt once if necessary. You do **not** need to keep polishing indefinitely; if the tool does not help, consult a familiar script or the official documentation instead.
+
+**Pause and reflect:** Can you explain the task without AI? If you cannot yet define what the output should mean, defining that is your first job.
+
+# 3. Practice 2: Use AI to debug, then audit the code (20 min) {-}
+
+AI can be an effective coding partner, especially when you can already specify the data structure and the intended operation. But code that runs is not necessarily code that answers your research question.
+
+Let's use a tiny dataset that we can check ourselves. (These are **synthetic** examples, not actual social media observations.)
+
+```{r toy-data}
+library(dplyr)
+library(tibble)
+
+posts <- tibble(
+  outlet = c("A", "A", "B", "B", "B"),
+  likes  = c(10, NA, 8, 12, 0)
+)
+
+posts
+```
+
+We want to calculate the average likes by outlet. Try this first:
+
+```{r code-with-a-problem}
+posts %>%
+  group_by(outlet) %>%
+  summarise(
+    mean_likes = mean(likes),
+    n_posts = n(),
+    .groups = "drop"
+  )
+```
+
+**Step A (4 min).** Before asking AI: what do you notice about the result? Why does one group not have a numeric mean? Work out the expected answers by hand.
+
+**Step B (5 min).** Ask your AI tool:
+
+> Please inspect this short `dplyr` pipeline. My goal is the average of *observed* likes by outlet, plus the total number of posts. Identify the problem, suggest the **smallest** correction, and explain each changed argument. Keep the original variable names and do not add a new package.
+
+Paste only the toy data and code above, not an unpublished dataset. Did the assistant identify the issue? Did it change anything else unnecessarily?
+
+**Step C (6 min).** Run the corrected code in R. Check three things yourself:
+
+1. Is the mean for outlet A **10**?
+2. Is the mean for outlet B approximately **6.67**?
+3. Are the numbers of posts still **2** for A and **3** for B?
+
+The key distinction: `n_posts` counts all rows; the mean should exclude missing values. Those are **different quantities**. Be alert if an AI suggestion silently converts `NA` to zero or drops rows before counting posts.
+
+**Step D (5 min).** In one or two sentences, write how you would validate AI-assisted code in a real project. For example: check each transformation, test a small known case, inspect missing values, and compare the output with your research design.
+
+**Takeaway:** My preferred approach is to begin with a research plan and coding patterns I understand, and ask AI to assist with a *bounded* step. I want to remain capable of explaining and reproducing the analysis without relying on the chat transcript.
+
+For R functions, always keep the [R for Data Science textbook](https://r4ds.hadley.nz/) or [dplyr reference](https://dplyr.tidyverse.org/reference/index.html) close at hand. Documentation, not a convincing AI explanation, is the authoritative source for what a function does.
+
+# 4. Practice 3: AI for literature discovery is not evidence verification (12 min) {-}
+
+AI-assisted search can help you discover unfamiliar terms or papers. That does **not** make AI an authoritative source about the literature. A real citation may be attached to a distorted claim, and a well-formatted citation may not exist at all.
+
+## Try it: Check what a paper actually claims {-}
+
+**Step A (3 min).** Ask an AI tool:
+
+> Briefly summarize Christopher Bail's 2024 paper, "Can Generative AI improve social science?" Identify two possible uses of generative AI in research and two limitations. Provide the DOI link. Tell me whether you actually accessed the article or are answering from prior knowledge. Do not invent quotations.
+
+**Step B (6 min).** Open the [original paper](https://doi.org/10.1073/pnas.2314021121). Read its abstract and the relevant discussion. Check:
+
+- Does the paper really discuss the applications and risks listed in the AI answer?
+- Is it mainly an argument/review of possibilities, or a new experiment establishing that AI is valid for all these uses?
+- Did the AI correctly distinguish **the author's argument** from **an established empirical finding**?
+
+**Step C (3 min).** Rewrite one sentence from the AI summary so that it is carefully qualified and accurately attributed to Bail. This is the kind of sentence you might responsibly include in a literature review after reading the source yourself.
+
+You have already encountered AI-assisted text annotation in our text-analysis weeks. Two useful papers to compare later are [Gilardi, Alizadeh, and Kubli (2023)](https://doi.org/10.1073/pnas.2305016120), which reports strong performance on several annotation tasks, and [Fasching and Lelkes (2025)](https://doi.org/10.18653/v1/2025.findings-acl.1144), which reports substantial differences in hate-speech classifications across systems. **The lesson is not that either study settles every application:** performance depends on the task, data, evaluation design, and chosen system.
+
+# 5. Privacy, boundaries, and reflection (8 min) {-}
+
+## Before uploading anything {-}
+
+A useful first question is not "Which AI is smartest?" but **"Am I permitted to give this material to this tool?"**
+
+For UT research or coursework, consult the [UT acceptable-use guidance](https://security.utexas.edu/ai-tools) and the [UT AI tools / approval matrix](https://tech.utexas.edu/services-tools/ai/ai-tools-matrix). Publicly available example data are different from student records, participant information, unpublished confidential research materials, and other controlled data. Use only approved tools and configurations for the classification of the material, and follow applicable study/IRB and collaborator agreements. An institutionally provided account does **not** mean you may upload every kind of data without checking the rules.
+
+**Privacy controls are not the same as permission.** In personal ChatGPT accounts, for example, [Data controls](https://help.openai.com/en/articles/7730893-data-controls-in-chatgpt) govern whether chats may be used for model improvement. [Temporary chat](https://help.openai.com/en/articles/8914046-temporary-chat-in-chatgpt) has different history and memory behavior, but is not a guarantee of zero retention, and third-party tools or connected services can have separate rules. UT-managed accounts may have different controls. Do not rely on a "temporary" label as authorization to share sensitive data.
+
+Before giving an agent access to files, email, or other apps, also ask: *Does it need that access? Can I limit its permissions? Can I inspect changes before accepting them?* For research, start with copies, dummy data, and separate work folders.
+
+## Your final 3-minute reflection {-}
+
+Consider the following situations. Decide **use AI / use with safeguards / do not use in this tool**, and explain why:
+
+1. You want to debug code for the synthetic dataset above.
+2. You want to upload unconsented interview transcripts to a personal AI chat for thematic analysis.
+3. You want an agent to reorganize the only copy of your final project folder automatically.
+
+Finally, complete these sentences for yourself:
+
+> A research task for which AI would probably save me time is ________.  
+> A research decision I must remain able to defend myself is ________.  
+> One way I will verify an AI output next week is ________.
+
+**You are responsible for the quality of the work you submit.** In J381M, follow the AI-use and acknowledgment requirements in our syllabus: say what tool you used and how you used it. For publication, also review the outlet's AI policy and the updated [APA Style guidance on citing generative AI](https://apastyle.apa.org/blog/cite-generative-ai-references).
+
+# Extended learning {-}
+
+Everything below is optional for today's one-hour tutorial. Explore the parts most relevant to your research.
+
+## A. Different systems, features, and terminology {-}
+
+A few terms you will encounter:
+
+- **Model:** The statistical system producing the response. A product may offer multiple models or change its default model over time.
+- **Token:** A unit of text processing used to count input/output; it is not equivalent to a word. Longer documents and more elaborate tasks can use more tokens or compute.
+- **Reasoning effort / model selection:** In some products you can trade speed or usage against more extensive processing. Test whether the additional effort improves *your particular task*.
+- **Project / workspace:** A place to organize related conversations and reference materials. It can reduce repeated instructions, but does not replace a clear data-governance decision.
+- **Memory / personalization:** Features that use prior information to tailor later responses. Review what is available and what you are comfortable retaining or connecting.
+- **Agent:** A system that may use tools and carry out a series of actions, rather than only answer a question. Check its permissions and outputs.
+- **Skill / reusable instruction:** A saved workflow, set of instructions, or package of task-specific procedures. It can help with repetitive work but should be tested; it is neither mandatory nor automatically reliable.
+- **Vibe coding:** An informal label for building software largely through natural-language AI instructions. Exploratory convenience should not replace transparent, auditable research analysis.
+
+**Optional experiment:** Run exactly the same bounded R question in two different approved AI products. Compare clarity, correctness, unnecessary complexity, and the amount of checking required. Avoid declaring a universal winner from one example.
+
+## B. AI as a writing and thinking partner {-}
+
+AI can be useful for finding a confusing sentence or identifying gaps in an explanation, but it may also smooth away the specificity of your argument. A research paper is not improved simply because every sentence sounds polished.
+
+**Optional experiment:** Write a 120-word explanation of *your own* research question first. Ask AI to flag unclear terms **without rewriting the passage**. Decide which suggestions you accept and why. This preserves your voice and the central concepts.
+
+If you use AI to brainstorm a design, record your original hypotheses and the reasons for your methodological choices *before* seeing suggestions. Keep a short record of consequential changes, and verify any new methods against original sources. The goal is to use AI to challenge your thinking, not to outsource it.
+
+For a perspective on learning risks, see [Bastani et al. (2025)](https://doi.org/10.1073/pnas.2422633122). Their experiment concerns high-school mathematics, **not** graduate computational media research; use it as a reason to ask whether support builds understanding, not as proof that every kind of AI use harms learning.
+
+## C. More reading: possibilities, limitations, and research practice {-}
+
+- **Overview for social scientists:** Bail, C. A. (2024). [Can Generative AI improve social science?](https://doi.org/10.1073/pnas.2314021121) *PNAS*. Useful for opportunities, caveats, and open research infrastructure.
+- **A positive result for some coding tasks:** Gilardi, F., Alizadeh, M., & Kubli, M. (2023). [ChatGPT outperforms crowd workers for text-annotation tasks](https://doi.org/10.1073/pnas.2305016120). *PNAS*. Think about how the specific benchmark defines success.
+- **A caution for measurement:** Fasching, N., & Lelkes, Y. (2025). [Model-Dependent Moderation: Inconsistencies in Hate Speech Detection Across LLM-based Systems](https://doi.org/10.18653/v1/2025.findings-acl.1144). *Findings of ACL*. Think about construct validity and model dependence.
+- **A learning-design caution:** Bastani, H., et al. (2025). [Generative AI without guardrails can harm learning: Evidence from high school mathematics](https://doi.org/10.1073/pnas.2422633122). *PNAS*. Consider what "learning" means in your own workflow.
+- **General risk framework:** [NIST Generative AI Profile (2024)](https://doi.org/10.6028/NIST.AI.600-1). A structured resource for understanding risks rather than a recommendation of one product.
+- **Prompt guidance:** [OpenAI](https://help.openai.com/en/articles/10032626) and [Anthropic](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices). Treat advice as tool-specific starting points that you should evaluate.
+- **Research reproducibility:** [Sandve et al. (2013), Ten Simple Rules for Reproducible Computational Research](https://doi.org/10.1371/journal.pcbi.1003285). These principles still matter when AI helps generate code.
+
+## D. Optional experiment: a bounded agent {-}
+
+If a UT-supported tool offers an agent or multi-step workflow mode, **do not begin by connecting your email, research drive, or actual project repository**. Instead, create a disposable folder with three *public or synthetic* files and ask the tool to propose an organization plan **without making changes**. Examine the plan; if the environment permits it, test one action on copies and check the result. The important lesson is how you specify permissions and verify actions—not how many steps the agent can complete.
+
+---
+
+**The bottom line:** The right question is not "Can AI do this?" but "Can I define the task, trust the data flow, and independently verify the result?" When the answer is yes, AI can be a useful assistant. When the answer is no, slow down and return to the methods, documentation, or original sources.
